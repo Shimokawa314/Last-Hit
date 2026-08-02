@@ -124,79 +124,6 @@
     font-weight:500;
   }
 
-  .link-btn{
-    background:transparent;
-    border:none;
-    color:var(--ink-soft);
-    font-size:0.78rem;
-    letter-spacing:0.03em;
-    padding:0.3rem 0.4rem;
-    text-decoration:underline;
-    text-underline-offset:3px;
-    cursor:pointer;
-    transition:color 0.2s ease;
-  }
-  .link-btn:hover{ color:var(--ink); }
-  .link-btn:focus-visible{ outline:2px solid var(--slate); outline-offset:3px; }
-
-  .link-btn-inline{
-    margin-left:0.3rem;
-    padding:0.1rem 0.2rem;
-    font-size:0.72rem;
-  }
-
-  .datetime-input{
-    font-family:'Space Mono', monospace;
-    font-size:0.95rem;
-    padding:0.6rem 0.7rem;
-    border:1px solid var(--line);
-    border-radius:10px;
-    background:var(--paper);
-    color:var(--ink);
-    width:100%;
-    box-sizing:border-box;
-  }
-  .datetime-input:focus{
-    outline:2px solid var(--slate);
-    outline-offset:2px;
-  }
-
-  .datetime-row{
-    display:flex;
-    align-items:center;
-    gap:0.6rem;
-  }
-  .datetime-row .datetime-input{
-    flex:1;
-  }
-
-  .seconds-field{
-    display:flex;
-    align-items:center;
-    gap:0.35rem;
-    flex-shrink:0;
-  }
-  .seconds-field label{
-    font-size:0.8rem;
-    color:var(--ink-soft);
-  }
-  .seconds-input{
-    font-family:'Space Mono', monospace;
-    font-size:0.95rem;
-    padding:0.6rem 0.5rem;
-    border:1px solid var(--line);
-    border-radius:10px;
-    background:var(--paper);
-    color:var(--ink);
-    width:3.4rem;
-    box-sizing:border-box;
-    text-align:center;
-  }
-  .seconds-input:focus{
-    outline:2px solid var(--slate);
-    outline-offset:2px;
-  }
-
   .idle-copy{
     font-family:'Zen Old Mincho', serif;
     font-size:clamp(1.3rem, 4vw, 1.7rem);
@@ -378,7 +305,6 @@
     <div class="eyebrow">Last Hit</div>
     <div class="idle-copy">吸わなかった時間を、<br>ここに積み上げていく。</div>
     <button class="btn-start" id="start-btn">今から始める</button>
-    <button class="link-btn" id="custom-start-btn">時刻を指定して始める</button>
     <div class="actions">
       <button class="btn-reset" id="history-btn-idle">History</button>
     </div>
@@ -394,7 +320,6 @@
     <div class="clock" id="clock-display">00<span class="sep">:</span>00<span class="sep">:</span>00</div>
     <div class="since">
       開始 <strong id="start-date-label">-</strong>
-      <button class="link-btn link-btn-inline" id="edit-start-btn">編集</button>
     </div>
 
     <div class="actions">
@@ -429,23 +354,6 @@
   </div>
 </div>
 
-<div class="confirm-box" id="start-time-box">
-  <div class="confirm-card">
-    <p id="start-time-title">開始した時刻を指定</p>
-    <div class="datetime-row">
-      <input type="datetime-local" id="start-time-input" class="datetime-input">
-      <div class="seconds-field">
-        <input type="number" id="start-time-seconds" class="seconds-input" min="0" max="59" step="1" value="00">
-        <label for="start-time-seconds">秒</label>
-      </div>
-    </div>
-    <div class="confirm-row" style="margin-top:1.4rem;">
-      <button class="confirm-cancel" id="start-time-cancel">やめておく</button>
-      <button class="confirm-yes" id="start-time-confirm">決定</button>
-    </div>
-  </div>
-</div>
-
 
 
 <script>
@@ -469,16 +377,6 @@
   const historyBtnRunning = document.getElementById('history-btn-running');
   const historyClose = document.getElementById('history-close');
   const histTabs = document.querySelectorAll('.hist-tab');
-  const customStartBtn = document.getElementById('custom-start-btn');
-  const editStartBtn = document.getElementById('edit-start-btn');
-  const startTimeBox = document.getElementById('start-time-box');
-  const startTimeTitle = document.getElementById('start-time-title');
-  const startTimeInput = document.getElementById('start-time-input');
-  const startTimeSeconds = document.getElementById('start-time-seconds');
-  const startTimeConfirm = document.getElementById('start-time-confirm');
-  const startTimeCancel = document.getElementById('start-time-cancel');
-
-  let startTimeModalMode = 'new'; // 'new' または 'edit'
 
   let startTime = null;
   let tickHandle = null;
@@ -492,11 +390,6 @@
     return `${d.getFullYear()}/${pad(d.getMonth()+1)}/${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
   }
 
-  // <input type="datetime-local"> はローカルタイムの "YYYY-MM-DDTHH:MM" 形式が必要(秒は別のinputで管理)
-  function formatForInput(ts){
-    const d = new Date(ts);
-    return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-  }
 
   function formatDuration(ms){
     const totalMinutes = Math.floor(ms/60000);
@@ -649,59 +542,6 @@
       tab.classList.add('active');
       renderHistory();
     });
-  });
-
-  customStartBtn.addEventListener('click', function(){
-    startTimeModalMode = 'new';
-    startTimeTitle.textContent = '開始した時刻を指定';
-    const now = Date.now();
-    startTimeInput.value = formatForInput(now);
-    startTimeSeconds.value = pad(new Date(now).getSeconds());
-    startTimeBox.classList.add('open');
-  });
-
-  editStartBtn.addEventListener('click', function(){
-    startTimeModalMode = 'edit';
-    startTimeTitle.textContent = '開始時刻を編集';
-    const base = startTime || Date.now();
-    startTimeInput.value = formatForInput(base);
-    startTimeSeconds.value = pad(new Date(base).getSeconds());
-    startTimeBox.classList.add('open');
-  });
-
-  startTimeCancel.addEventListener('click', function(){
-    startTimeBox.classList.remove('open');
-  });
-
-  startTimeConfirm.addEventListener('click', function(){
-    const value = startTimeInput.value;
-    if(!value){
-      startTimeBox.classList.remove('open');
-      return;
-    }
-    let secondsValue = parseInt(startTimeSeconds.value, 10);
-    if(isNaN(secondsValue)) secondsValue = 0;
-    secondsValue = Math.min(59, Math.max(0, secondsValue));
-
-    const ts = new Date(`${value}:${pad(secondsValue)}`).getTime();
-    if(isNaN(ts)){
-      startTimeBox.classList.remove('open');
-      return;
-    }
-
-    if(startTimeModalMode === 'new'){
-      startTime = ts;
-      localStorage.setItem(STORAGE_KEY, String(startTime));
-      startTimeBox.classList.remove('open');
-      showRunning();
-    } else {
-      startTime = ts;
-      localStorage.setItem(STORAGE_KEY, String(startTime));
-      startDateLabel.textContent = formatDate(startTime);
-      lastDrawnDays = null; // 背景を強制的に再描画
-      render();
-      startTimeBox.classList.remove('open');
-    }
   });
 
   // --- 背景: 経過日数ぶんの層が積み上がっていく表現(アニメーションではなく状態の描画) ---
