@@ -1,0 +1,804 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="theme-color" content="#EDEEEA">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Last Hit">
+<link rel="manifest" href="manifest.json">
+<title>Last Hit</title>
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+<link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Zen+Old+Mincho:wght@400;600&family=Zen+Kaku+Gothic+New:wght@400;500;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#EDEEEA;
+    --paper-deep:#E3E5DF;
+    --ink:#1B1D1F;
+    --ink-soft:#53595D;
+    --mist:#9AA5AC;
+    --slate:#3E4A52;
+    --slate-deep:#2C363D;
+    --line:#CBCDC7;
+  }
+
+  *{ box-sizing:border-box; }
+
+  html,body{
+    margin:0; padding:0;
+    width:100%; height:100dvh;
+    background:var(--paper);
+    color:var(--ink);
+    font-family:'Zen Kaku Gothic New', sans-serif;
+    overflow:hidden;
+    -webkit-font-smoothing:antialiased;
+  }
+
+  #mist-canvas{
+    position:fixed; inset:0;
+    width:100%; height:100%;
+    z-index:0;
+  }
+
+
+  .stage{
+    position:relative;
+    z-index:1;
+    width:100%;
+    height:100dvh;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    padding:8vh 6vw;
+    text-align:center;
+  }
+
+  /* 背景のレンガと重なっても文字が読めるよう、うっすら紙色のパネルを敷く */
+  .content-panel{
+    background:rgba(237,238,234,0.55);
+    backdrop-filter:blur(8px);
+    -webkit-backdrop-filter:blur(8px);
+    border-radius:28px;
+    padding:2.6rem 2.2rem;
+  }
+
+  .eyebrow{
+    font-size:0.72rem;
+    letter-spacing:0.32em;
+    color:var(--ink-soft);
+    text-transform:uppercase;
+    margin-bottom:1.4rem;
+    min-height:1em;
+  }
+
+  .days-row{
+    display:flex;
+    align-items:baseline;
+    gap:0.6rem;
+    line-height:1;
+  }
+
+  .days-num{
+    font-family:'Zen Old Mincho', serif;
+    font-weight:600;
+    font-size:clamp(4.5rem, 20vw, 9rem);
+    letter-spacing:0.01em;
+    color:var(--ink);
+    font-variant-numeric:tabular-nums;
+  }
+
+  .days-label{
+    font-family:'Zen Old Mincho', serif;
+    font-size:clamp(1.1rem, 3vw, 1.5rem);
+    color:var(--ink-soft);
+    padding-bottom:0.6rem;
+  }
+
+  .clock{
+    margin-top:0.6rem;
+    font-family:'Space Mono', monospace;
+    font-size:clamp(1.1rem, 3.6vw, 1.6rem);
+    letter-spacing:0.08em;
+    color:var(--slate);
+    font-variant-numeric:tabular-nums;
+  }
+
+  .clock .sep{ color:var(--mist); margin:0 0.15em; }
+
+  .since{
+    margin-top:2.2rem;
+    font-size:0.82rem;
+    color:var(--ink-soft);
+    letter-spacing:0.02em;
+  }
+
+  .since strong{
+    color:var(--ink);
+    font-weight:500;
+  }
+
+  .link-btn{
+    background:transparent;
+    border:none;
+    color:var(--ink-soft);
+    font-size:0.78rem;
+    letter-spacing:0.03em;
+    padding:0.3rem 0.4rem;
+    text-decoration:underline;
+    text-underline-offset:3px;
+    cursor:pointer;
+    transition:color 0.2s ease;
+  }
+  .link-btn:hover{ color:var(--ink); }
+  .link-btn:focus-visible{ outline:2px solid var(--slate); outline-offset:3px; }
+
+  .link-btn-inline{
+    margin-left:0.3rem;
+    padding:0.1rem 0.2rem;
+    font-size:0.72rem;
+  }
+
+  .datetime-input{
+    font-family:'Space Mono', monospace;
+    font-size:0.95rem;
+    padding:0.6rem 0.7rem;
+    border:1px solid var(--line);
+    border-radius:10px;
+    background:var(--paper);
+    color:var(--ink);
+    width:100%;
+    box-sizing:border-box;
+  }
+  .datetime-input:focus{
+    outline:2px solid var(--slate);
+    outline-offset:2px;
+  }
+
+  .idle-copy{
+    font-family:'Zen Old Mincho', serif;
+    font-size:clamp(1.3rem, 4vw, 1.7rem);
+    color:var(--ink);
+    max-width:20ch;
+    line-height:1.7;
+    margin-bottom:2.8rem;
+  }
+
+  .actions{
+    margin-top:3rem;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:1rem;
+  }
+
+  button{
+    font-family:'Zen Kaku Gothic New', sans-serif;
+    font-size:0.95rem;
+    letter-spacing:0.06em;
+    border:none;
+    cursor:pointer;
+    -webkit-tap-highlight-color:transparent;
+  }
+
+  .btn-start{
+    background:var(--slate);
+    color:var(--paper);
+    padding:1.05rem 3.2rem;
+    border-radius:999px;
+    font-weight:500;
+    transition:background 0.25s ease, transform 0.15s ease;
+  }
+  .btn-start:hover{ background:var(--slate-deep); }
+  .btn-start:active{ transform:scale(0.97); }
+  .btn-start:focus-visible{ outline:2px solid var(--slate); outline-offset:4px; }
+
+  .btn-reset{
+    background:transparent;
+    color:var(--ink-soft);
+    padding:0.5rem 1rem;
+    border-bottom:1px solid transparent;
+    transition:border-color 0.2s ease, color 0.2s ease;
+  }
+  .btn-reset:hover{ color:var(--ink); border-color:var(--line); }
+  .btn-reset:focus-visible{ outline:2px solid var(--slate); outline-offset:3px; }
+
+  .confirm-box{
+    position:fixed;
+    inset:0;
+    z-index:5;
+    background:rgba(27,29,31,0.42);
+    display:none;
+    align-items:center;
+    justify-content:center;
+    padding:6vw;
+  }
+  .confirm-box.open{ display:flex; }
+
+  .confirm-card{
+    background:var(--paper);
+    border-radius:18px;
+    padding:2.2rem 2rem;
+    max-width:320px;
+    text-align:center;
+    box-shadow:0 20px 60px rgba(0,0,0,0.18);
+  }
+  .confirm-card p{
+    font-family:'Zen Old Mincho', serif;
+    font-size:1.05rem;
+    line-height:1.8;
+    margin:0 0 1.6rem;
+    color:var(--ink);
+  }
+  .confirm-row{ display:flex; gap:0.7rem; justify-content:center; }
+  .confirm-row button{
+    padding:0.7rem 1.3rem;
+    border-radius:999px;
+    font-size:0.85rem;
+  }
+  .confirm-cancel{ background:var(--paper-deep); color:var(--ink-soft); }
+  .confirm-cancel:hover{ background:var(--line); }
+  .confirm-yes{ background:var(--slate); color:var(--paper); }
+  .confirm-yes:hover{ background:var(--slate-deep); }
+
+  .footer-note{
+    position:fixed;
+    bottom:1.4rem;
+    left:0; right:0;
+    text-align:center;
+    font-size:0.68rem;
+    letter-spacing:0.06em;
+    color:var(--ink-soft);
+    opacity:0.55;
+    z-index:1;
+  }  .history-card{ max-width:340px; width:88vw; text-align:left; }
+  .history-title{
+    font-family:'Zen Old Mincho', serif;
+    font-size:1.05rem;
+    color:var(--ink);
+    text-align:center;
+    margin-bottom:1.2rem;
+  }
+  .history-toggle{
+    display:flex;
+    justify-content:center;
+    gap:0.4rem;
+    margin-bottom:1.1rem;
+  }
+  .hist-tab{
+    background:transparent;
+    color:var(--ink-soft);
+    font-size:0.78rem;
+    letter-spacing:0.04em;
+    padding:0.4rem 0.8rem;
+    border-radius:999px;
+    border:1px solid var(--line);
+    transition:background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+  }
+  .hist-tab.active{
+    background:var(--slate);
+    color:var(--paper);
+    border-color:var(--slate);
+  }
+  .history-list{
+    max-height:44vh;
+    overflow-y:auto;
+    display:flex;
+    flex-direction:column;
+    gap:0.1rem;
+  }
+  .history-empty{
+    font-size:0.85rem;
+    color:var(--ink-soft);
+    text-align:center;
+    padding:1.2rem 0;
+  }
+  .history-item{
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    padding:0.7rem 0.2rem;
+    border-bottom:1px solid var(--line);
+  }
+  .history-item:last-child{ border-bottom:none; }
+  .history-rank{
+    font-family:'Space Mono', monospace;
+    font-size:0.72rem;
+    color:var(--mist);
+    width:1.6rem;
+    flex-shrink:0;
+  }
+  .history-duration{
+    font-family:'Zen Old Mincho', serif;
+    font-size:0.98rem;
+    color:var(--ink);
+    flex:1;
+    padding:0 0.5rem;
+  }
+  .history-date{
+    font-family:'Space Mono', monospace;
+    font-size:0.66rem;
+    color:var(--ink-soft);
+    text-align:right;
+    white-space:nowrap;
+  }
+  .history-best .history-duration{ color:var(--slate); font-weight:600; }
+</style>
+</head>
+<body>
+
+<canvas id="mist-canvas"></canvas>
+
+<div class="stage">
+
+  <!-- 開始前 -->
+  <div id="idle-view" class="content-panel">
+    <div class="eyebrow">Last Hit</div>
+    <div class="idle-copy">吸わなかった時間を、<br>ここに積み上げていく。</div>
+    <button class="btn-start" id="start-btn">今から始める</button>
+    <button class="link-btn" id="custom-start-btn">時刻を指定して始める</button>
+    <div class="actions">
+      <button class="btn-reset" id="history-btn-idle">History</button>
+    </div>
+  </div>
+
+  <!-- 計測中 -->
+  <div id="running-view" class="content-panel" style="display:none;">
+    <div class="eyebrow">Elapsed</div>
+    <div class="days-row">
+      <span class="days-num" id="day-count">0</span>
+      <span class="days-label">日</span>
+    </div>
+    <div class="clock" id="clock-display">00<span class="sep">:</span>00<span class="sep">:</span>00</div>
+    <div class="since">
+      開始 <strong id="start-date-label">-</strong>
+      <button class="link-btn link-btn-inline" id="edit-start-btn">編集</button>
+    </div>
+
+    <div class="actions">
+      <button class="btn-reset" id="history-btn-running">History</button>
+      <button class="btn-reset" id="reset-btn">Reset</button>
+    </div>
+  </div>
+
+</div>
+
+<div class="confirm-box" id="confirm-box">
+  <div class="confirm-card">
+    <p>記録をリセットして、<br>最初からやり直しますか?</p>
+    <div class="confirm-row">
+      <button class="confirm-cancel" id="confirm-cancel">やめておく</button>
+      <button class="confirm-yes" id="confirm-yes">リセットする</button>
+    </div>
+  </div>
+</div>
+
+<div class="confirm-box" id="history-box">
+  <div class="confirm-card history-card">
+    <div class="history-title">History</div>
+    <div class="history-toggle">
+      <button class="hist-tab active" data-mode="duration">長い順</button>
+      <button class="hist-tab" data-mode="recent">新しい順</button>
+    </div>
+    <div class="history-list" id="history-list"></div>
+    <div class="confirm-row" style="margin-top:1.6rem;">
+      <button class="confirm-cancel" id="history-close">閉じる</button>
+    </div>
+  </div>
+</div>
+
+<div class="confirm-box" id="start-time-box">
+  <div class="confirm-card">
+    <p id="start-time-title">開始した時刻を指定</p>
+    <input type="datetime-local" id="start-time-input" class="datetime-input" step="1">
+    <div class="confirm-row" style="margin-top:1.4rem;">
+      <button class="confirm-cancel" id="start-time-cancel">やめておく</button>
+      <button class="confirm-yes" id="start-time-confirm">決定</button>
+    </div>
+  </div>
+</div>
+
+
+
+<script>
+(function(){
+  const STORAGE_KEY = 'quitSmokingStart';
+  const HISTORY_KEY = 'quitSmokingHistory';
+
+  const idleView = document.getElementById('idle-view');
+  const runningView = document.getElementById('running-view');
+  const startBtn = document.getElementById('start-btn');
+  const resetBtn = document.getElementById('reset-btn');
+  const dayCountEl = document.getElementById('day-count');
+  const clockEl = document.getElementById('clock-display');
+  const startDateLabel = document.getElementById('start-date-label');
+  const confirmBox = document.getElementById('confirm-box');
+  const confirmYes = document.getElementById('confirm-yes');
+  const confirmCancel = document.getElementById('confirm-cancel');
+  const historyBox = document.getElementById('history-box');
+  const historyList = document.getElementById('history-list');
+  const historyBtnIdle = document.getElementById('history-btn-idle');
+  const historyBtnRunning = document.getElementById('history-btn-running');
+  const historyClose = document.getElementById('history-close');
+  const histTabs = document.querySelectorAll('.hist-tab');
+  const customStartBtn = document.getElementById('custom-start-btn');
+  const editStartBtn = document.getElementById('edit-start-btn');
+  const startTimeBox = document.getElementById('start-time-box');
+  const startTimeTitle = document.getElementById('start-time-title');
+  const startTimeInput = document.getElementById('start-time-input');
+  const startTimeConfirm = document.getElementById('start-time-confirm');
+  const startTimeCancel = document.getElementById('start-time-cancel');
+
+  let startTimeModalMode = 'new'; // 'new' または 'edit'
+
+  let startTime = null;
+  let tickHandle = null;
+  let historySortMode = 'duration';
+  let lastDrawnDays = null;
+
+  function pad(n){ return String(n).padStart(2,'0'); }
+
+  function formatDate(ts){
+    const d = new Date(ts);
+    return `${d.getFullYear()}/${pad(d.getMonth()+1)}/${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+  }
+
+  // <input type="datetime-local" step="1"> はローカルタイムの "YYYY-MM-DDTHH:MM:SS" 形式が必要
+  function formatForInput(ts){
+    const d = new Date(ts);
+    return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+  }
+
+  function formatDuration(ms){
+    const totalMinutes = Math.floor(ms/60000);
+    const days = Math.floor(totalMinutes/1440);
+    const hours = Math.floor((totalMinutes%1440)/60);
+    const minutes = totalMinutes%60;
+    if(days > 0) return `${days}日 ${hours}時間`;
+    if(hours > 0) return `${hours}時間 ${minutes}分`;
+    return `${minutes}分`;
+  }
+
+  function loadHistory(){
+    try{
+      const raw = localStorage.getItem(HISTORY_KEY);
+      return raw ? JSON.parse(raw) : [];
+    } catch(e){ return []; }
+  }
+
+  function pruneHistory(history){
+    const byRecent = history.slice().sort((a,b)=> b.endedAt - a.endedAt).slice(0,10);
+    const byDuration = history.slice().sort((a,b)=> b.duration - a.duration).slice(0,10);
+    const keepIds = new Set([...byRecent, ...byDuration].map(x=> x.endedAt));
+    return history.filter(x=> keepIds.has(x.endedAt));
+  }
+
+  function saveAttemptToHistory(durationMs){
+    if(durationMs < 60000) return; // 1分未満は記録しない
+    let history = loadHistory();
+    history.push({ duration: durationMs, endedAt: Date.now() });
+    history = pruneHistory(history);
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
+  }
+
+  function renderHistory(){
+    const history = loadHistory().slice().sort((a,b)=>{
+      return historySortMode === 'recent'
+        ? b.endedAt - a.endedAt
+        : b.duration - a.duration;
+    });
+    historyList.innerHTML = '';
+    if(history.length === 0){
+      historyList.innerHTML = '<div class="history-empty">まだ記録がありません</div>';
+      return;
+    }
+    const maxDuration = Math.max(...history.map(x=>x.duration));
+    history.forEach((item, i)=>{
+      const row = document.createElement('div');
+      row.className = 'history-item' + (item.duration === maxDuration ? ' history-best' : '');
+      row.innerHTML = `
+        <span class="history-rank">${i+1}</span>
+        <span class="history-duration">${formatDuration(item.duration)}</span>
+        <span class="history-date">${formatDate(item.endedAt)}</span>
+      `;
+      historyList.appendChild(row);
+    });
+  }
+
+  function render(){
+    const now = Date.now();
+    let diff = Math.max(0, now - startTime);
+    const totalSeconds = Math.floor(diff/1000);
+    const days = Math.floor(totalSeconds/86400);
+    const hours = Math.floor((totalSeconds%86400)/3600);
+    const minutes = Math.floor((totalSeconds%3600)/60);
+    const seconds = totalSeconds%60;
+
+    dayCountEl.textContent = days;
+    clockEl.innerHTML = `${pad(hours)}<span class="sep">:</span>${pad(minutes)}<span class="sep">:</span>${pad(seconds)}`;
+
+    if(days !== lastDrawnDays){
+      drawBlocks(days);
+      lastDrawnDays = days;
+    }
+  }
+
+  function startTicking(){
+    render();
+    tickHandle = setInterval(render, 1000);
+  }
+
+  function showRunning(){
+    idleView.style.display = 'none';
+    runningView.style.display = 'flex';
+    runningView.style.flexDirection = 'column';
+    runningView.style.alignItems = 'center';
+    startDateLabel.textContent = formatDate(startTime);
+    startTicking();
+  }
+
+  function showIdle(){
+    runningView.style.display = 'none';
+    idleView.style.display = 'flex';
+    idleView.style.flexDirection = 'column';
+    idleView.style.alignItems = 'center';
+    if(tickHandle){ clearInterval(tickHandle); tickHandle = null; }
+    lastDrawnDays = 0;
+    drawBlocks(0);
+  }
+
+  function init(){
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if(saved){
+      startTime = parseInt(saved, 10);
+      showRunning();
+    } else {
+      showIdle();
+    }
+  }
+
+  startBtn.addEventListener('click', function(){
+    startTime = Date.now();
+    localStorage.setItem(STORAGE_KEY, String(startTime));
+    showRunning();
+  });
+
+  resetBtn.addEventListener('click', function(){
+    confirmBox.classList.add('open');
+  });
+
+  confirmCancel.addEventListener('click', function(){
+    confirmBox.classList.remove('open');
+  });
+
+  confirmYes.addEventListener('click', function(){
+    if(startTime){
+      saveAttemptToHistory(Date.now() - startTime);
+    }
+    localStorage.removeItem(STORAGE_KEY);
+    confirmBox.classList.remove('open');
+    startTime = null;
+    showIdle();
+  });
+
+  historyBtnIdle.addEventListener('click', function(){
+    renderHistory();
+    historyBox.classList.add('open');
+  });
+  historyBtnRunning.addEventListener('click', function(){
+    renderHistory();
+    historyBox.classList.add('open');
+  });
+  historyClose.addEventListener('click', function(){
+    historyBox.classList.remove('open');
+  });
+
+  histTabs.forEach(function(tab){
+    tab.addEventListener('click', function(){
+      historySortMode = tab.dataset.mode;
+      histTabs.forEach(t=> t.classList.remove('active'));
+      tab.classList.add('active');
+      renderHistory();
+    });
+  });
+
+  customStartBtn.addEventListener('click', function(){
+    startTimeModalMode = 'new';
+    startTimeTitle.textContent = '開始した時刻を指定';
+    startTimeInput.value = formatForInput(Date.now());
+    startTimeBox.classList.add('open');
+  });
+
+  editStartBtn.addEventListener('click', function(){
+    startTimeModalMode = 'edit';
+    startTimeTitle.textContent = '開始時刻を編集';
+    startTimeInput.value = formatForInput(startTime || Date.now());
+    startTimeBox.classList.add('open');
+  });
+
+  startTimeCancel.addEventListener('click', function(){
+    startTimeBox.classList.remove('open');
+  });
+
+  startTimeConfirm.addEventListener('click', function(){
+    const value = startTimeInput.value;
+    if(!value){
+      startTimeBox.classList.remove('open');
+      return;
+    }
+    const ts = new Date(value).getTime();
+    if(isNaN(ts)){
+      startTimeBox.classList.remove('open');
+      return;
+    }
+
+    if(startTimeModalMode === 'new'){
+      startTime = ts;
+      localStorage.setItem(STORAGE_KEY, String(startTime));
+      startTimeBox.classList.remove('open');
+      showRunning();
+    } else {
+      startTime = ts;
+      localStorage.setItem(STORAGE_KEY, String(startTime));
+      startDateLabel.textContent = formatDate(startTime);
+      lastDrawnDays = null; // 背景を強制的に再描画
+      render();
+      startTimeBox.classList.remove('open');
+    }
+  });
+
+  // --- 背景: 経過日数ぶんの層が積み上がっていく表現(アニメーションではなく状態の描画) ---
+  const canvas = document.getElementById('mist-canvas');
+  const ctx = canvas.getContext('2d');
+  let W, H, DPR;
+
+  function resize(){
+    DPR = Math.min(window.devicePixelRatio || 1, 2);
+    const vv = window.visualViewport;
+    W = vv ? vv.width : window.innerWidth;
+    H = vv ? vv.height : window.innerHeight;
+    H = Math.max(H, document.documentElement.clientHeight, window.innerHeight);
+    canvas.width = W * DPR;
+    canvas.height = H * DPR;
+    canvas.style.width = W+'px';
+    canvas.style.height = H+'px';
+    ctx.setTransform(DPR,0,0,DPR,0,0);
+    drawBlocks(lastDrawnDays || 0);
+  }
+  window.addEventListener('resize', resize);
+  window.addEventListener('orientationchange', resize);
+  if(window.visualViewport){
+    window.visualViewport.addEventListener('resize', resize);
+    window.visualViewport.addEventListener('scroll', resize);
+  }
+
+  // シード値から常に同じ値を返す疑似乱数(再描画のたびに形が変わらないように)
+  function seededRandom(seed){
+    const x = Math.sin(seed*12.9898 + 78.233) * 43758.5453;
+    return x - Math.floor(x);
+  }
+
+  // 2色を t(0〜1) で補間する簡易的なグラデーション(レンガごとの色味の違いに使う)
+  function lerpColor(c1, c2, t){
+    return [
+      Math.round(c1[0] + (c2[0]-c1[0])*t),
+      Math.round(c1[1] + (c2[1]-c1[1])*t),
+      Math.round(c1[2] + (c2[2]-c1[2])*t)
+    ];
+  }
+
+  // レンガの寸法・並びを、指定した縮小率(sizeScale)から計算する
+  function brickLayout(sizeScale){
+    const brickW = Math.max(18, W * 0.12) * sizeScale;
+    const brickH = brickW * 0.46;             // レンガらしい横長比率
+    const mortar = Math.max(1, brickW * 0.07); // 目地(すき間)の太さ
+    // 段の端が半分だけ欠けても構わない(実際のレンガ壁と同じ「破れ目地」なので、
+    // 1段分の本数は少し多めに見積もっておく
+    const bricksPerRow = Math.max(1, Math.ceil(W / (brickW + mortar)) + 1);
+    const rowHeight = brickH + mortar;
+    return { brickW, brickH, mortar, bricksPerRow, rowHeight };
+  }
+
+  // 1日 = レンガ1個。下の段から横一列に並べ、埋まったら1段上へ。
+  // 1段おきに半分ずつずらして積む「破れ目地」で、実際のレンガ塀と同じ積み方になる
+  function drawBlocks(days){
+    if(!W || !H) return;
+    ctx.clearRect(0,0,W,H);
+    if(!days || days <= 0) return;
+
+    const marginTop = 60;
+    const marginBottom = 6;
+    const floorY = H - marginBottom;
+    const availableHeight = floorY - marginTop;
+    const maxBricks = Math.min(days, 3000);
+
+    // 積み上がりすぎて画面からはみ出しそうな場合は、レンガを小さくして収める
+    // (横に並ぶ本数も変わるので、幅の縮小率のだいたい2乗で高さが縮む→平方根で見積もる)
+    let sizeScale = 1;
+    let layout = brickLayout(sizeScale);
+    let requiredHeight = Math.ceil(maxBricks / layout.bricksPerRow) * layout.rowHeight;
+    if(requiredHeight > availableHeight){
+      sizeScale = Math.max(0.14, Math.sqrt(availableHeight / requiredHeight) * 0.96);
+      layout = brickLayout(sizeScale);
+      // 縮小後にもう一度だけ確認して、必要なら追加で少し縮める
+      requiredHeight = Math.ceil(maxBricks / layout.bricksPerRow) * layout.rowHeight;
+      if(requiredHeight > availableHeight){
+        sizeScale = Math.max(0.1, sizeScale * (availableHeight / requiredHeight) * 0.96);
+        layout = brickLayout(sizeScale);
+      }
+    }
+
+    const { brickW, brickH, mortar, bricksPerRow, rowHeight } = layout;
+
+    // レンガの色味(暗めのスレート 〜 明るめのミストグレー)
+    const darkBrick = [44, 54, 61];
+    const lightBrick = [140, 150, 158];
+    const radius = Math.min(brickW, brickH) * 0.08;
+
+    for(let i=0; i<maxBricks; i++){
+      const row = Math.floor(i / bricksPerRow);
+      const posInRow = i % bricksPerRow;
+
+      // 1段おきに半分ずらす(破れ目地)
+      const rowOffset = (row % 2 === 1) ? -(brickW + mortar) / 2 : 0;
+      const x = posInRow * (brickW + mortar) + rowOffset;
+      const y = floorY - (row + 1) * rowHeight;
+
+      // 画面の外(上のテキストにかぶる領域)に出たレンガは描かない
+      if(y < marginTop - brickH) continue;
+      // 左右にはみ出す分は自然に切れて見えるだけなので描画してよいが、
+      // 完全に画面の外(右)にあるものだけ省く
+      if(x > W || x + brickW < 0) continue;
+
+      const r5 = seededRandom(i*11.3 + 6.7);  // レンガ1個ごとの色味(ランダム)
+      const r9 = seededRandom(i*23.9 + 14.2); // 明るさの細かい揺らぎ
+
+      const [baseR, baseG, baseB] = lerpColor(darkBrick, lightBrick, r5);
+
+      const shade = 0.92 + r9*0.16; // レンガ1個ごとの、ごくわずかな焼きムラ
+      const cr = Math.min(255, Math.round(baseR*shade));
+      const cg = Math.min(255, Math.round(baseG*shade));
+      const cb = Math.min(255, Math.round(baseB*shade));
+
+      const fillColor = `rgba(${cr},${cg},${cb},0.88)`;
+      const edgeColor = `rgba(${Math.round(cr*0.7)},${Math.round(cg*0.7)},${Math.round(cb*0.7)},0.9)`;
+
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(x+radius, y);
+      ctx.lineTo(x+brickW-radius, y);
+      ctx.quadraticCurveTo(x+brickW, y, x+brickW, y+radius);
+      ctx.lineTo(x+brickW, y+brickH-radius);
+      ctx.quadraticCurveTo(x+brickW, y+brickH, x+brickW-radius, y+brickH);
+      ctx.lineTo(x+radius, y+brickH);
+      ctx.quadraticCurveTo(x, y+brickH, x, y+brickH-radius);
+      ctx.lineTo(x, y+radius);
+      ctx.quadraticCurveTo(x, y, x+radius, y);
+      ctx.closePath();
+
+      ctx.fillStyle = fillColor;
+      ctx.fill();
+      ctx.strokeStyle = edgeColor;
+      ctx.lineWidth = Math.max(1, brickH*0.05);
+      ctx.stroke();
+
+      ctx.restore();
+    }
+  }
+
+  resize();
+  setTimeout(resize, 300); // iOS Safariのツールバー確定後に再計測
+
+  init();
+
+})();
+</script>
+
+</body>
+</html>
