@@ -161,6 +161,42 @@
     outline-offset:2px;
   }
 
+  .datetime-row{
+    display:flex;
+    align-items:center;
+    gap:0.6rem;
+  }
+  .datetime-row .datetime-input{
+    flex:1;
+  }
+
+  .seconds-field{
+    display:flex;
+    align-items:center;
+    gap:0.35rem;
+    flex-shrink:0;
+  }
+  .seconds-field label{
+    font-size:0.8rem;
+    color:var(--ink-soft);
+  }
+  .seconds-input{
+    font-family:'Space Mono', monospace;
+    font-size:0.95rem;
+    padding:0.6rem 0.5rem;
+    border:1px solid var(--line);
+    border-radius:10px;
+    background:var(--paper);
+    color:var(--ink);
+    width:3.4rem;
+    box-sizing:border-box;
+    text-align:center;
+  }
+  .seconds-input:focus{
+    outline:2px solid var(--slate);
+    outline-offset:2px;
+  }
+
   .idle-copy{
     font-family:'Zen Old Mincho', serif;
     font-size:clamp(1.3rem, 4vw, 1.7rem);
@@ -396,7 +432,13 @@
 <div class="confirm-box" id="start-time-box">
   <div class="confirm-card">
     <p id="start-time-title">開始した時刻を指定</p>
-    <input type="datetime-local" id="start-time-input" class="datetime-input" step="1">
+    <div class="datetime-row">
+      <input type="datetime-local" id="start-time-input" class="datetime-input">
+      <div class="seconds-field">
+        <input type="number" id="start-time-seconds" class="seconds-input" min="0" max="59" step="1" value="00">
+        <label for="start-time-seconds">秒</label>
+      </div>
+    </div>
     <div class="confirm-row" style="margin-top:1.4rem;">
       <button class="confirm-cancel" id="start-time-cancel">やめておく</button>
       <button class="confirm-yes" id="start-time-confirm">決定</button>
@@ -432,6 +474,7 @@
   const startTimeBox = document.getElementById('start-time-box');
   const startTimeTitle = document.getElementById('start-time-title');
   const startTimeInput = document.getElementById('start-time-input');
+  const startTimeSeconds = document.getElementById('start-time-seconds');
   const startTimeConfirm = document.getElementById('start-time-confirm');
   const startTimeCancel = document.getElementById('start-time-cancel');
 
@@ -449,10 +492,10 @@
     return `${d.getFullYear()}/${pad(d.getMonth()+1)}/${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
   }
 
-  // <input type="datetime-local" step="1"> はローカルタイムの "YYYY-MM-DDTHH:MM:SS" 形式が必要
+  // <input type="datetime-local"> はローカルタイムの "YYYY-MM-DDTHH:MM" 形式が必要(秒は別のinputで管理)
   function formatForInput(ts){
     const d = new Date(ts);
-    return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+    return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
   }
 
   function formatDuration(ms){
@@ -611,14 +654,18 @@
   customStartBtn.addEventListener('click', function(){
     startTimeModalMode = 'new';
     startTimeTitle.textContent = '開始した時刻を指定';
-    startTimeInput.value = formatForInput(Date.now());
+    const now = Date.now();
+    startTimeInput.value = formatForInput(now);
+    startTimeSeconds.value = pad(new Date(now).getSeconds());
     startTimeBox.classList.add('open');
   });
 
   editStartBtn.addEventListener('click', function(){
     startTimeModalMode = 'edit';
     startTimeTitle.textContent = '開始時刻を編集';
-    startTimeInput.value = formatForInput(startTime || Date.now());
+    const base = startTime || Date.now();
+    startTimeInput.value = formatForInput(base);
+    startTimeSeconds.value = pad(new Date(base).getSeconds());
     startTimeBox.classList.add('open');
   });
 
@@ -632,7 +679,11 @@
       startTimeBox.classList.remove('open');
       return;
     }
-    const ts = new Date(value).getTime();
+    let secondsValue = parseInt(startTimeSeconds.value, 10);
+    if(isNaN(secondsValue)) secondsValue = 0;
+    secondsValue = Math.min(59, Math.max(0, secondsValue));
+
+    const ts = new Date(`${value}:${pad(secondsValue)}`).getTime();
     if(isNaN(ts)){
       startTimeBox.classList.remove('open');
       return;
@@ -684,6 +735,18 @@
     return x - Math.floor(x);
   }
 
+  // 0〜n-1 を、seedごとに常に同じ順番でシャッフルした配列を返す
+  // (同じ段なら何度描き直しても同じ並び方になる)
+  function shuffledIndices(n, seed){
+    const arr = Array.from({length:n}, (_, k) => k);
+    for(let k=n-1; k>0; k--){
+      const r = seededRandom(seed*97.7 + k*13.31 + 3.1);
+      const j = Math.floor(r * (k+1));
+      const tmp = arr[k]; arr[k] = arr[j]; arr[j] = tmp;
+    }
+    return arr;
+  }
+
   // 2色を t(0〜1) で補間する簡易的なグラデーション(レンガごとの色味の違いに使う)
   function lerpColor(c1, c2, t){
     return [
@@ -705,15 +768,15 @@
     return { brickW, brickH, mortar, bricksPerRow, rowHeight };
   }
 
-  // 1日 = レンガ1個。下の段から横一列に並べ、埋まったら1段上へ。
-  // 1段おきに半分ずつずらして積む「破れ目地」で、実際のレンガ塀と同じ積み方になる
+  // 1日 = レンガ1個。下の段から順に、段の中のどこに置かれるかはランダム。
+  // 段が埋まったら1段上へ。1段おきに半分ずつずらして積む「破れ目地」で、実際のレンガ塀と同じ積み方になる
   function drawBlocks(days){
     if(!W || !H) return;
     ctx.clearRect(0,0,W,H);
     if(!days || days <= 0) return;
 
     const marginTop = 60;
-    const marginBottom = 6;
+    const marginBottom = -14; // 一番下の段が画面端にぴったり(むしろ少し埋まる)ように
     const floorY = H - marginBottom;
     const availableHeight = floorY - marginTop;
     const maxBricks = Math.min(days, 3000);
@@ -741,9 +804,20 @@
     const lightBrick = [140, 150, 158];
     const radius = Math.min(brickW, brickH) * 0.08;
 
+    let currentRow = -1;
+    let currentRowOrder = null;
+
     for(let i=0; i<maxBricks; i++){
       const row = Math.floor(i / bricksPerRow);
-      const posInRow = i % bricksPerRow;
+      const orderInRow = i % bricksPerRow;
+
+      // 段が変わったら、その段用のランダムな並び順を作る(段番号がシードなので、
+      // 同じ段は毎回同じシャッフル結果になる)
+      if(row !== currentRow){
+        currentRow = row;
+        currentRowOrder = shuffledIndices(bricksPerRow, row);
+      }
+      const posInRow = currentRowOrder[orderInRow];
 
       // 1段おきに半分ずらす(破れ目地)
       const rowOffset = (row % 2 === 1) ? -(brickW + mortar) / 2 : 0;
@@ -756,7 +830,7 @@
       // 完全に画面の外(右)にあるものだけ省く
       if(x > W || x + brickW < 0) continue;
 
-      const r5 = seededRandom(i*11.3 + 6.7);  // レンガ1個ごとの色味(ランダム)
+      const r5 = seededRandom(i*11.3 + 6.7);  // レンガ1個ごとの色味(ランダムだが範囲は狭め)
       const r9 = seededRandom(i*23.9 + 14.2); // 明るさの細かい揺らぎ
 
       const [baseR, baseG, baseB] = lerpColor(darkBrick, lightBrick, r5);
