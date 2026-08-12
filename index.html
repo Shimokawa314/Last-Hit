@@ -608,38 +608,48 @@
     return { brickW, brickH, mortar, bricksPerRow, rowHeight };
   }
 
-  // 1日 = レンガ1個。下の段から順に、段の中のどこに置かれるかはランダム。
-  // 段が埋まったら1段上へ。1段おきに半分ずつずらして積む「破れ目地」で、実際のレンガ塀と同じ積み方になる
-  function drawBlocks(days){
-    if(!W || !H) return;
-    ctx.clearRect(0,0,W,H);
-    if(!days || days <= 0) return;
-
-    const marginTop = 60;
-    const marginBottom = -14; // 一番下の段が画面端にぴったり(むしろ少し埋まる)ように
-    const floorY = H - marginBottom;
-    const availableHeight = floorY - marginTop;
-    const maxBricks = Math.min(days, 3000);
-
-    // 積み上がりすぎて画面からはみ出しそうな場合は、レンガを小さくして収める
-    // (横に並ぶ本数も変わるので、幅の縮小率のだいたい2乗で高さが縮む→平方根で見積もる)
-    let sizeScale = 1;
-    let layout = brickLayout(sizeScale);
-    let requiredHeight = Math.ceil(maxBricks / layout.bricksPerRow) * layout.rowHeight;
-    if(requiredHeight > availableHeight){
-      sizeScale = Math.max(0.14, Math.sqrt(availableHeight / requiredHeight) * 0.96);
-      layout = brickLayout(sizeScale);
-      // 縮小後にもう一度だけ確認して、必要なら追加で少し縮める
-      requiredHeight = Math.ceil(maxBricks / layout.bricksPerRow) * layout.rowHeight;
-      if(requiredHeight > availableHeight){
-        sizeScale = Math.max(0.1, sizeScale * (availableHeight / requiredHeight) * 0.96);
-        layout = brickLayout(sizeScale);
-      }
+  // 何周期目にいるか、その周期に必要な日数、その周期の中で何日目かを計算する。
+  // 1周期目=30日、2周期目=60日、3周期目=90日…と、周期ごとに必要日数が30日ずつ伸びていく
+  function getCycleInfo(totalDays){
+    let n = 1;
+    let cumulative = 0;
+    while(cumulative + 30*n <= totalDays){
+      cumulative += 30*n;
+      n++;
     }
+    return {
+      cycleNumber: n,
+      cycleLength: 30*n,       // この周期を満タンにするのに必要な日数
+      daysIntoCycle: totalDays - cumulative // この周期に入ってから経過した日数
+    };
+  }
 
+  // targetBricks本でぴったり画面に収まるレンガのサイズを逆算する
+  // (段の本数が整数で丸まる関係で一発では決まらないので、何回か計算し直して近づける)
+  function computeBrickSizing(targetBricks, availableHeight){
+    let sizeScale = 1;
+    let layout, requiredHeight;
+    for(let iter=0; iter<10; iter++){
+      layout = brickLayout(sizeScale);
+      requiredHeight = Math.ceil(targetBricks / layout.bricksPerRow) * layout.rowHeight;
+      const ratio = (availableHeight * 0.985) / requiredHeight;
+      sizeScale = Math.max(0.06, Math.min(6, sizeScale * Math.sqrt(ratio)));
+    }
+    layout = brickLayout(sizeScale);
+    requiredHeight = Math.ceil(targetBricks / layout.bricksPerRow) * layout.rowHeight;
+    // はみ出す場合だけ、念のため確実に収まるまで少しずつ縮める
+    while(requiredHeight > availableHeight && sizeScale > 0.05){
+      sizeScale *= 0.96;
+      layout = brickLayout(sizeScale);
+      requiredHeight = Math.ceil(targetBricks / layout.bricksPerRow) * layout.rowHeight;
+    }
+    return layout;
+  }
+
+  // レンガをcount個、下の段から順に(段の中はランダム順で)積んで描画する。
+  // opacityを下げると、前回の周期を薄い「ゴースト」として見せられる
+  function drawBrickWall(count, layout, floorY, marginTop, opacity){
     const { brickW, brickH, mortar, bricksPerRow, rowHeight } = layout;
-
-    // レンガの色味(暗めのスレート 〜 明るめのミストグレー)
     const darkBrick = [44, 54, 61];
     const lightBrick = [140, 150, 158];
     const radius = Math.min(brickW, brickH) * 0.08;
@@ -647,41 +657,34 @@
     let currentRow = -1;
     let currentRowOrder = null;
 
-    for(let i=0; i<maxBricks; i++){
+    for(let i=0; i<count; i++){
       const row = Math.floor(i / bricksPerRow);
       const orderInRow = i % bricksPerRow;
 
-      // 段が変わったら、その段用のランダムな並び順を作る(段番号がシードなので、
-      // 同じ段は毎回同じシャッフル結果になる)
       if(row !== currentRow){
         currentRow = row;
         currentRowOrder = shuffledIndices(bricksPerRow, row);
       }
       const posInRow = currentRowOrder[orderInRow];
 
-      // 1段おきに半分ずらす(破れ目地)
       const rowOffset = (row % 2 === 1) ? -(brickW + mortar) / 2 : 0;
       const x = posInRow * (brickW + mortar) + rowOffset;
       const y = floorY - (row + 1) * rowHeight;
 
-      // 画面の外(上のテキストにかぶる領域)に出たレンガは描かない
       if(y < marginTop - brickH) continue;
-      // 左右にはみ出す分は自然に切れて見えるだけなので描画してよいが、
-      // 完全に画面の外(右)にあるものだけ省く
       if(x > W || x + brickW < 0) continue;
 
-      const r5 = seededRandom(i*11.3 + 6.7);  // レンガ1個ごとの色味(ランダムだが範囲は狭め)
-      const r9 = seededRandom(i*23.9 + 14.2); // 明るさの細かい揺らぎ
+      const r5 = seededRandom(i*11.3 + 6.7);
+      const r9 = seededRandom(i*23.9 + 14.2);
 
       const [baseR, baseG, baseB] = lerpColor(darkBrick, lightBrick, r5);
-
-      const shade = 0.92 + r9*0.16; // レンガ1個ごとの、ごくわずかな焼きムラ
+      const shade = 0.92 + r9*0.16;
       const cr = Math.min(255, Math.round(baseR*shade));
       const cg = Math.min(255, Math.round(baseG*shade));
       const cb = Math.min(255, Math.round(baseB*shade));
 
-      const fillColor = `rgba(${cr},${cg},${cb},0.88)`;
-      const edgeColor = `rgba(${Math.round(cr*0.7)},${Math.round(cg*0.7)},${Math.round(cb*0.7)},0.9)`;
+      const fillColor = `rgba(${cr},${cg},${cb},${(0.88*opacity).toFixed(3)})`;
+      const edgeColor = `rgba(${Math.round(cr*0.7)},${Math.round(cg*0.7)},${Math.round(cb*0.7)},${(0.9*opacity).toFixed(3)})`;
 
       ctx.save();
       ctx.beginPath();
@@ -704,6 +707,35 @@
 
       ctx.restore();
     }
+  }
+
+  // 1日 = レンガ1個。下の段から順に、段の中のどこに置かれるかはランダム。
+  // 段が埋まったら1段上へ。1段おきに半分ずつずらして積む「破れ目地」で、実際のレンガ塀と同じ積み方になる
+  // 壁は「その周期に必要な日数ぶんで画面がちょうど満タンになる」大きさで組み、
+  // 満タンになったら次の(必要日数が長い)周期としてまた0から積み直す。
+  // 前回の周期の壁は、薄いゴーストとして背後に残す
+  function drawBlocks(days){
+    if(!W || !H) return;
+    ctx.clearRect(0,0,W,H);
+    if(!days || days <= 0) return;
+
+    const marginTop = 60;
+    const marginBottom = -14; // 一番下の段が画面端にぴったり(むしろ少し埋まる)ように
+    const floorY = H - marginBottom;
+    const availableHeight = floorY - marginTop;
+
+    const { cycleNumber, cycleLength, daysIntoCycle } = getCycleInfo(Math.min(days, 100000));
+    const currentCount = Math.max(1, daysIntoCycle + 1);
+    const currentLayout = computeBrickSizing(cycleLength, availableHeight);
+
+    // 2周期目以降は、前回満タンにした壁を薄く背後に残す
+    if(cycleNumber > 1){
+      const prevCycleLength = 30 * (cycleNumber - 1);
+      const prevLayout = computeBrickSizing(prevCycleLength, availableHeight);
+      drawBrickWall(prevCycleLength, prevLayout, floorY, marginTop, 0.22);
+    }
+
+    drawBrickWall(currentCount, currentLayout, floorY, marginTop, 1);
   }
 
   resize();
