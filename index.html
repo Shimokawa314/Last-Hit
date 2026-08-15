@@ -604,8 +604,10 @@
     const brickH = brickW * heightRatio;
     const mortar = Math.max(1, brickW * mortarRatio);
     const bricksPerRow = Math.max(1, Math.ceil(W / (brickW + mortar)));
+    // 1段おきにずらす(破れ目地)行は、半分ずれる分だけ端が欠けやすいので1本多く必要
+    const bricksPerRowOffset = bricksPerRow + 1;
     const rowHeight = brickH + mortar;
-    return { brickW, brickH, mortar, bricksPerRow, rowHeight };
+    return { brickW, brickH, mortar, bricksPerRow, bricksPerRowOffset, rowHeight };
   }
 
   // 何周期目にいるか、その周期に必要な日数、その周期の中で何日目かを計算する。
@@ -624,12 +626,19 @@
     };
   }
 
+  // rows段ぶんの合計収容数(偶数段=bricksPerRow、奇数段=bricksPerRowOffsetの合計)
+  function totalCapacity(layout, rows){
+    const pairs = Math.floor(rows / 2);
+    const remainder = rows % 2; // 割り切れなかった1段は偶数段(ずらさない段)として数える
+    return pairs * (layout.bricksPerRow + layout.bricksPerRowOffset) + remainder * layout.bricksPerRow;
+  }
+
   // targetBricks本がちょうど収まる最小の段数(=一番大きなレンガサイズ)を探して、
   // その段数ぶんで画面の高さをぴったり使い切るレンガサイズを返す
   function computeBrickSizing(targetBricks, availableHeight){
     for(let rows=1; rows<=300; rows++){
       const layout = brickLayoutForRows(rows, availableHeight);
-      if(layout.bricksPerRow * rows >= targetBricks){
+      if(totalCapacity(layout, rows) >= targetBricks){
         return layout;
       }
     }
@@ -640,67 +649,72 @@
   // レンガをcount個、下の段から順に(段の中はランダム順で)積んで描画する。
   // opacityを下げると、前回の周期を薄い「ゴースト」として見せられる
   function drawBrickWall(count, layout, floorY, marginTop, opacity, seedOffset){
-    const { brickW, brickH, mortar, bricksPerRow, rowHeight } = layout;
+    const { brickW, brickH, mortar, bricksPerRow, bricksPerRowOffset, rowHeight } = layout;
     const darkBrick = [44, 54, 61];
     const lightBrick = [140, 150, 158];
     const radius = Math.min(brickW, brickH) * 0.08;
     const seedBase = seedOffset * 100000; // 周期ごとに乱数の種をずらして、毎回違う並び・色にする
 
-    let currentRow = -1;
-    let currentRowOrder = null;
+    let placed = 0;
+    let row = 0;
 
-    for(let i=0; i<count; i++){
-      const row = Math.floor(i / bricksPerRow);
-      const orderInRow = i % bricksPerRow;
+    while(placed < count){
+      const isOffsetRow = (row % 2 === 1);
+      const rowCapacity = isOffsetRow ? bricksPerRowOffset : bricksPerRow;
+      const rowOrder = shuffledIndices(rowCapacity, seedBase + row);
+      const numInThisRow = Math.min(rowCapacity, count - placed);
 
-      if(row !== currentRow){
-        currentRow = row;
-        currentRowOrder = shuffledIndices(bricksPerRow, seedBase + row);
-      }
-      const posInRow = currentRowOrder[orderInRow];
-
-      // 1段おきに半分ずらす(破れ目地)。ずれの向きは段ごとにランダムにして、
-      // 端に出る隙間が毎回同じ側に偏らないようにする
-      const shiftSign = seededRandom(seedBase + row*7.3 + 2.1) < 0.5 ? -1 : 1;
-      const rowOffset = (row % 2 === 1) ? shiftSign * (brickW + mortar) / 2 : 0;
-      const x = posInRow * (brickW + mortar) + rowOffset;
+      // ずれは常に左方向。右にずらすと計算上どうしても左端に隙間ができてしまうため、
+      // 常に左にずらし、その分1本多く(bricksPerRowOffset)並べて右端まで確実に覆う
+      const rowOffsetPx = isOffsetRow ? -(brickW + mortar) / 2 : 0;
       const y = floorY - (row + 1) * rowHeight;
 
-      if(y < marginTop - brickH) continue;
-      if(x > W || x + brickW < 0) continue;
+      for(let k=0; k<numInThisRow; k++){
+        const posInRow = rowOrder[k];
+        const i = placed; // 通し番号(色・乱数の種に使う)
+        const x = posInRow * (brickW + mortar) + rowOffsetPx;
 
-      const r5 = seededRandom(seedBase + i*11.3 + 6.7);
-      const r9 = seededRandom(seedBase + i*23.9 + 14.2);
+        placed++;
 
-      const [baseR, baseG, baseB] = lerpColor(darkBrick, lightBrick, r5);
-      const shade = 0.92 + r9*0.16;
-      const cr = Math.min(255, Math.round(baseR*shade));
-      const cg = Math.min(255, Math.round(baseG*shade));
-      const cb = Math.min(255, Math.round(baseB*shade));
+        if(y < marginTop - brickH) continue;
+        if(x > W || x + brickW < 0) continue;
 
-      const fillColor = `rgba(${cr},${cg},${cb},${(1.0*opacity).toFixed(3)})`;
-      const edgeColor = `rgba(${Math.round(cr*0.7)},${Math.round(cg*0.7)},${Math.round(cb*0.7)},${(1.0*opacity).toFixed(3)})`;
+        const r5 = seededRandom(seedBase + i*11.3 + 6.7);
+        const r9 = seededRandom(seedBase + i*23.9 + 14.2);
 
-      ctx.save();
-      ctx.beginPath();
-      ctx.moveTo(x+radius, y);
-      ctx.lineTo(x+brickW-radius, y);
-      ctx.quadraticCurveTo(x+brickW, y, x+brickW, y+radius);
-      ctx.lineTo(x+brickW, y+brickH-radius);
-      ctx.quadraticCurveTo(x+brickW, y+brickH, x+brickW-radius, y+brickH);
-      ctx.lineTo(x+radius, y+brickH);
-      ctx.quadraticCurveTo(x, y+brickH, x, y+brickH-radius);
-      ctx.lineTo(x, y+radius);
-      ctx.quadraticCurveTo(x, y, x+radius, y);
-      ctx.closePath();
+        const [baseR, baseG, baseB] = lerpColor(darkBrick, lightBrick, r5);
+        const shade = 0.92 + r9*0.16;
+        const cr = Math.min(255, Math.round(baseR*shade));
+        const cg = Math.min(255, Math.round(baseG*shade));
+        const cb = Math.min(255, Math.round(baseB*shade));
 
-      ctx.fillStyle = fillColor;
-      ctx.fill();
-      ctx.strokeStyle = edgeColor;
-      ctx.lineWidth = Math.max(1, brickH*0.05);
-      ctx.stroke();
+        const fillColor = `rgba(${cr},${cg},${cb},${(1.0*opacity).toFixed(3)})`;
+        const edgeColor = `rgba(${Math.round(cr*0.7)},${Math.round(cg*0.7)},${Math.round(cb*0.7)},${(1.0*opacity).toFixed(3)})`;
 
-      ctx.restore();
+        ctx.save();
+        ctx.beginPath();
+        ctx.moveTo(x+radius, y);
+        ctx.lineTo(x+brickW-radius, y);
+        ctx.quadraticCurveTo(x+brickW, y, x+brickW, y+radius);
+        ctx.lineTo(x+brickW, y+brickH-radius);
+        ctx.quadraticCurveTo(x+brickW, y+brickH, x+brickW-radius, y+brickH);
+        ctx.lineTo(x+radius, y+brickH);
+        ctx.quadraticCurveTo(x, y+brickH, x, y+brickH-radius);
+        ctx.lineTo(x, y+radius);
+        ctx.quadraticCurveTo(x, y, x+radius, y);
+        ctx.closePath();
+
+        ctx.fillStyle = fillColor;
+        ctx.fill();
+        ctx.strokeStyle = edgeColor;
+        ctx.lineWidth = Math.max(1, brickH*0.05);
+        ctx.stroke();
+
+        ctx.restore();
+      }
+
+      row++;
+      if(row > 500) break; // 安全弁
     }
   }
 
@@ -726,7 +740,7 @@
     if(!days || days <= 0) return;
 
     const marginTop = 60;
-    const marginBottom = -14; // 一番下の段が画面端にぴったり(むしろ少し埋まる)ように
+    const marginBottom = 0; // 段の高さは計算でぴったり画面に収まるので、埋め込みは不要
     const floorY = H - marginBottom;
     const availableHeight = floorY - marginTop;
 
