@@ -576,7 +576,7 @@
   }
 
   // 0〜n-1 を、seedごとに常に同じ順番でシャッフルした配列を返す
-  // (同じ段なら何度描き直しても同じ並び方になる)
+  // (同じ段なら何度描き直しても同じ並び方になる=段(周回)ごとに違う順番)
   function shuffledIndices(n, seed){
     const arr = Array.from({length:n}, (_, k) => k);
     for(let k=n-1; k>0; k--){
@@ -587,7 +587,7 @@
     return arr;
   }
 
-  // 2色を t(0〜1) で補間する簡易的なグラデーション(レンガごとの色味の違いに使う)
+  // 2色を t(0〜1) で補間する簡易的なグラデーション
   function lerpColor(c1, c2, t){
     return [
       Math.round(c1[0] + (c2[0]-c1[0])*t),
@@ -604,32 +604,15 @@
     const brickH = brickW * heightRatio;
     const mortar = Math.max(1, brickW * mortarRatio);
     const bricksPerRow = Math.max(1, Math.ceil(W / (brickW + mortar)));
-    // 1段おきにずらす(破れ目地)行は、半分ずれる分だけ端が欠けやすいので1本多く必要
-    const bricksPerRowOffset = bricksPerRow + 1;
+    const bricksPerRowOffset = bricksPerRow + 1; // 破れ目地でずれる段は1本多く必要
     const rowHeight = brickH + mortar;
     return { brickW, brickH, mortar, bricksPerRow, bricksPerRowOffset, rowHeight };
   }
 
-  // 何周期目にいるか、その周期に必要な日数、その周期の中で何日目かを計算する。
-  // 1周期目=30日、2周期目=60日、3周期目=90日…と、周期ごとに必要日数が30日ずつ伸びていく
-  function getCycleInfo(totalDays){
-    let n = 1;
-    let cumulative = 0;
-    while(cumulative + 30*n <= totalDays){
-      cumulative += 30*n;
-      n++;
-    }
-    return {
-      cycleNumber: n,
-      cycleLength: 30*n,       // この周期を満タンにするのに必要な日数
-      daysIntoCycle: totalDays - cumulative // この周期に入ってから経過した日数
-    };
-  }
-
-  // rows段ぶんの合計収容数(偶数段=bricksPerRow、奇数段=bricksPerRowOffsetの合計)
+  // rows段ぶんの合計収容数
   function totalCapacity(layout, rows){
     const pairs = Math.floor(rows / 2);
-    const remainder = rows % 2; // 割り切れなかった1段は偶数段(ずらさない段)として数える
+    const remainder = rows % 2;
     return pairs * (layout.bricksPerRow + layout.bricksPerRowOffset) + remainder * layout.bricksPerRow;
   }
 
@@ -642,18 +625,37 @@
         return layout;
       }
     }
-    // 万一見つからなければ(非常に大きい日数)、小さいレンガで確実に収める
     return brickLayoutForRows(300, availableHeight);
   }
 
-  // レンガをcount個、下の段から順に(段の中はランダム順で)積んで描画する。
-  // opacityを下げると、前回の周期を薄い「ゴースト」として見せられる
-  function drawBrickWall(count, layout, floorY, marginTop, opacity, seedOffset){
+  // 60から始めて、daysを超えるまで倍々にしていった時の「レベル上限」を返す
+  // (60 → 120 → 240 → ...)
+  function getLevelTarget(days){
+    let levelTarget = 60;
+    while(days > levelTarget){
+      levelTarget *= 2;
+    }
+    return levelTarget;
+  }
+
+  // Historyの中から直近(最後)の記録の日数を取得する
+  function getLastHistoryRecordDays(){
+    const history = loadHistory();
+    if(!history || history.length === 0) return null;
+    let last = history[0];
+    for(const item of history){
+      if(item.endedAt > last.endedAt) last = item;
+    }
+    return Math.floor(last.duration / 1000 / 86400);
+  }
+
+  // レンガの壁をcount個ぶん描画する(色・並び順の乱数はseedOffsetで種を変える)
+  function drawWall(count, layout, floorY, marginTop, opacity, seedOffset){
     const { brickW, brickH, mortar, bricksPerRow, bricksPerRowOffset, rowHeight } = layout;
-    const darkBrick = [44, 54, 61];
-    const lightBrick = [140, 150, 158];
+    const colorA = [44, 54, 61];
+    const colorB = [140, 150, 158];
     const radius = Math.min(brickW, brickH) * 0.08;
-    const seedBase = seedOffset * 100000; // 周期ごとに乱数の種をずらして、毎回違う並び・色にする
+    const seedBase = seedOffset * 100000;
 
     let placed = 0;
     let row = 0;
@@ -664,32 +666,24 @@
       const rowOrder = shuffledIndices(rowCapacity, seedBase + row);
       const numInThisRow = Math.min(rowCapacity, count - placed);
 
-      // ずれは常に左方向。右にずらすと計算上どうしても左端に隙間ができてしまうため、
-      // 常に左にずらし、その分1本多く(bricksPerRowOffset)並べて右端まで確実に覆う
       const rowOffsetPx = isOffsetRow ? -(brickW + mortar) / 2 : 0;
       const y = floorY - (row + 1) * rowHeight;
 
+      const rowColorT = seededRandom(seedBase + row*31.7 + 4.4);
+      const [rowR, rowG, rowB] = lerpColor(colorA, colorB, rowColorT);
+
       for(let k=0; k<numInThisRow; k++){
         const posInRow = rowOrder[k];
-        const i = placed; // 通し番号(色・乱数の種に使う)
         const x = posInRow * (brickW + mortar) + rowOffsetPx;
-
         placed++;
 
         if(y < marginTop - brickH) continue;
         if(x > W || x + brickW < 0) continue;
 
-        const r5 = seededRandom(seedBase + i*11.3 + 6.7);
-        const r9 = seededRandom(seedBase + i*23.9 + 14.2);
-
-        const [baseR, baseG, baseB] = lerpColor(darkBrick, lightBrick, r5);
-        const shade = 0.92 + r9*0.16;
-        const cr = Math.min(255, Math.round(baseR*shade));
-        const cg = Math.min(255, Math.round(baseG*shade));
-        const cb = Math.min(255, Math.round(baseB*shade));
-
-        const fillColor = `rgba(${cr},${cg},${cb},${(1.0*opacity).toFixed(3)})`;
-        const edgeColor = `rgba(${Math.round(cr*0.7)},${Math.round(cg*0.7)},${Math.round(cb*0.7)},${(1.0*opacity).toFixed(3)})`;
+        const rB = seededRandom(seedBase + row*53.1 + posInRow*7.7 + 1.3);
+        const cr = Math.min(255, Math.max(0, Math.round(rowR + (rB-0.5)*70)));
+        const cg = Math.min(255, Math.max(0, Math.round(rowG + (rB-0.5)*70)));
+        const cb = Math.min(255, Math.max(0, Math.round(rowB + (rB-0.5)*70)));
 
         ctx.save();
         ctx.beginPath();
@@ -704,9 +698,9 @@
         ctx.quadraticCurveTo(x, y, x+radius, y);
         ctx.closePath();
 
-        ctx.fillStyle = fillColor;
+        ctx.fillStyle = `rgba(${cr},${cg},${cb},${opacity})`;
         ctx.fill();
-        ctx.strokeStyle = edgeColor;
+        ctx.strokeStyle = `rgba(${Math.round(cr*0.7)},${Math.round(cg*0.7)},${Math.round(cb*0.7)},${opacity})`;
         ctx.lineWidth = Math.max(1, brickH*0.05);
         ctx.stroke();
 
@@ -718,47 +712,35 @@
     }
   }
 
-  // Historyの中から直近(最後)の記録の日数を取得する
-  function getLastHistoryRecordDays(){
-    const history = loadHistory();
-    if(!history || history.length === 0) return null;
-    let last = history[0];
-    for(const item of history){
-      if(item.endedAt > last.endedAt) last = item;
-    }
-    return Math.floor(last.duration / 1000 / 86400);
-  }
-
-  // 1日 = レンガ1個。下の段から順に、段の中のどこに置かれるかはランダム。
-  // 段が埋まったら1段上へ。1段おきに半分ずつずらして積む「破れ目地」で、実際のレンガ塀と同じ積み方になる
-  // 壁は「その周期に必要な日数ぶんで画面がちょうど満タンになる」大きさで組み、
-  // 満タンになったら次の(必要日数が長い)周期としてまた0から積み直す。
-  // 前回の記録(Historyの直近の記録)は、次の30の倍数に達するまで薄いゴーストとして背後に残す
+  // 1日 = レンガ1個。下の段から順に、段の中はランダムな順番で積んでいく。
+  // 60日前後で画面がちょうどいっぱいになるサイズを基準にして、
+  // 満タンを超えるたびにターゲットが倍になり、また画面半分くらいから積み直す。
+  // Historyの直近の記録は、対応するレベル上限に達するまで薄いゴーストとして背後に残る
   function drawBlocks(days){
     if(!W || !H) return;
     ctx.clearRect(0,0,W,H);
     if(!days || days <= 0) return;
 
     const marginTop = 60;
-    const marginBottom = 0; // 段の高さは計算でぴったり画面に収まるので、埋め込みは不要
+    const marginBottom = 0;
     const floorY = H - marginBottom;
     const availableHeight = floorY - marginTop;
 
-    const { cycleNumber, cycleLength, daysIntoCycle } = getCycleInfo(Math.min(days, 100000));
-    const currentCount = Math.max(1, daysIntoCycle + 1);
-    const currentLayout = computeBrickSizing(cycleLength, availableHeight);
+    const maxBricks = Math.min(days, 3000);
+    const levelTarget = getLevelTarget(maxBricks);
+    const currentLayout = computeBrickSizing(levelTarget, availableHeight);
 
-    // 前回の記録が、次の30の倍数に達するまではゴーストとして薄く背後に残す
+    // 前回の記録は、その記録に対応するレベル上限に達するまでゴーストとして薄く背後に残す
+    // (現在の壁と同じサイズで重ねる)
     const lastRecordDays = getLastHistoryRecordDays();
     if(lastRecordDays && lastRecordDays > 0){
-      const hideThreshold = Math.ceil(lastRecordDays / 30) * 30;
-      if(days <= hideThreshold){
-        const ghostLayout = computeBrickSizing(lastRecordDays, availableHeight);
-        drawBrickWall(lastRecordDays, ghostLayout, floorY, marginTop, 0.22, 99999);
+      const hideThreshold = getLevelTarget(lastRecordDays);
+      if(maxBricks <= hideThreshold){
+        drawWall(lastRecordDays, currentLayout, floorY, marginTop, 0.22, 99999);
       }
     }
 
-    drawBrickWall(currentCount, currentLayout, floorY, marginTop, 1, cycleNumber);
+    drawWall(maxBricks, currentLayout, floorY, marginTop, 1, 1);
   }
 
   resize();
