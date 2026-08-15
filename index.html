@@ -596,14 +596,14 @@
     ];
   }
 
-  // レンガの寸法・並びを、指定した縮小率(sizeScale)から計算する
-  function brickLayout(sizeScale){
-    const brickW = Math.max(18, W * 0.12) * sizeScale;
-    const brickH = brickW * 0.46;             // レンガらしい横長比率
-    const mortar = Math.max(1, brickW * 0.07); // 目地(すき間)の太さ
-    // 段の端が半分だけ欠けても構わない(実際のレンガ壁と同じ「破れ目地」なので、
-    // 1段分の本数は少し多めに見積もっておく
-    const bricksPerRow = Math.max(1, Math.ceil(W / (brickW + mortar)) + 1);
+  // rows段でちょうどavailableHeightを使い切るような、レンガの寸法を逆算する
+  function brickLayoutForRows(rows, availableHeight){
+    const heightRatio = 0.46;  // レンガらしい横長比率(高さ/幅)
+    const mortarRatio = 0.07;  // 目地(すき間)の太さ(幅に対する比率)
+    const brickW = Math.max(14, availableHeight / (rows * (heightRatio + mortarRatio)));
+    const brickH = brickW * heightRatio;
+    const mortar = Math.max(1, brickW * mortarRatio);
+    const bricksPerRow = Math.max(1, Math.ceil(W / (brickW + mortar)));
     const rowHeight = brickH + mortar;
     return { brickW, brickH, mortar, bricksPerRow, rowHeight };
   }
@@ -624,35 +624,27 @@
     };
   }
 
-  // targetBricks本でぴったり画面に収まるレンガのサイズを逆算する
-  // (段の本数が整数で丸まる関係で一発では決まらないので、何回か計算し直して近づける)
+  // targetBricks本がちょうど収まる最小の段数(=一番大きなレンガサイズ)を探して、
+  // その段数ぶんで画面の高さをぴったり使い切るレンガサイズを返す
   function computeBrickSizing(targetBricks, availableHeight){
-    let sizeScale = 1;
-    let layout, requiredHeight;
-    for(let iter=0; iter<10; iter++){
-      layout = brickLayout(sizeScale);
-      requiredHeight = Math.ceil(targetBricks / layout.bricksPerRow) * layout.rowHeight;
-      const ratio = (availableHeight * 0.985) / requiredHeight;
-      sizeScale = Math.max(0.06, Math.min(6, sizeScale * Math.sqrt(ratio)));
+    for(let rows=1; rows<=300; rows++){
+      const layout = brickLayoutForRows(rows, availableHeight);
+      if(layout.bricksPerRow * rows >= targetBricks){
+        return layout;
+      }
     }
-    layout = brickLayout(sizeScale);
-    requiredHeight = Math.ceil(targetBricks / layout.bricksPerRow) * layout.rowHeight;
-    // はみ出す場合だけ、念のため確実に収まるまで少しずつ縮める
-    while(requiredHeight > availableHeight && sizeScale > 0.05){
-      sizeScale *= 0.96;
-      layout = brickLayout(sizeScale);
-      requiredHeight = Math.ceil(targetBricks / layout.bricksPerRow) * layout.rowHeight;
-    }
-    return layout;
+    // 万一見つからなければ(非常に大きい日数)、小さいレンガで確実に収める
+    return brickLayoutForRows(300, availableHeight);
   }
 
   // レンガをcount個、下の段から順に(段の中はランダム順で)積んで描画する。
   // opacityを下げると、前回の周期を薄い「ゴースト」として見せられる
-  function drawBrickWall(count, layout, floorY, marginTop, opacity){
+  function drawBrickWall(count, layout, floorY, marginTop, opacity, seedOffset){
     const { brickW, brickH, mortar, bricksPerRow, rowHeight } = layout;
     const darkBrick = [44, 54, 61];
     const lightBrick = [140, 150, 158];
     const radius = Math.min(brickW, brickH) * 0.08;
+    const seedBase = seedOffset * 100000; // 周期ごとに乱数の種をずらして、毎回違う並び・色にする
 
     let currentRow = -1;
     let currentRowOrder = null;
@@ -663,19 +655,22 @@
 
       if(row !== currentRow){
         currentRow = row;
-        currentRowOrder = shuffledIndices(bricksPerRow, row);
+        currentRowOrder = shuffledIndices(bricksPerRow, seedBase + row);
       }
       const posInRow = currentRowOrder[orderInRow];
 
-      const rowOffset = (row % 2 === 1) ? -(brickW + mortar) / 2 : 0;
+      // 1段おきに半分ずらす(破れ目地)。ずれの向きは段ごとにランダムにして、
+      // 端に出る隙間が毎回同じ側に偏らないようにする
+      const shiftSign = seededRandom(seedBase + row*7.3 + 2.1) < 0.5 ? -1 : 1;
+      const rowOffset = (row % 2 === 1) ? shiftSign * (brickW + mortar) / 2 : 0;
       const x = posInRow * (brickW + mortar) + rowOffset;
       const y = floorY - (row + 1) * rowHeight;
 
       if(y < marginTop - brickH) continue;
       if(x > W || x + brickW < 0) continue;
 
-      const r5 = seededRandom(i*11.3 + 6.7);
-      const r9 = seededRandom(i*23.9 + 14.2);
+      const r5 = seededRandom(seedBase + i*11.3 + 6.7);
+      const r9 = seededRandom(seedBase + i*23.9 + 14.2);
 
       const [baseR, baseG, baseB] = lerpColor(darkBrick, lightBrick, r5);
       const shade = 0.92 + r9*0.16;
@@ -683,8 +678,8 @@
       const cg = Math.min(255, Math.round(baseG*shade));
       const cb = Math.min(255, Math.round(baseB*shade));
 
-      const fillColor = `rgba(${cr},${cg},${cb},${(0.88*opacity).toFixed(3)})`;
-      const edgeColor = `rgba(${Math.round(cr*0.7)},${Math.round(cg*0.7)},${Math.round(cb*0.7)},${(0.9*opacity).toFixed(3)})`;
+      const fillColor = `rgba(${cr},${cg},${cb},${(1.0*opacity).toFixed(3)})`;
+      const edgeColor = `rgba(${Math.round(cr*0.7)},${Math.round(cg*0.7)},${Math.round(cb*0.7)},${(1.0*opacity).toFixed(3)})`;
 
       ctx.save();
       ctx.beginPath();
@@ -709,11 +704,22 @@
     }
   }
 
+  // Historyの中から直近(最後)の記録の日数を取得する
+  function getLastHistoryRecordDays(){
+    const history = loadHistory();
+    if(!history || history.length === 0) return null;
+    let last = history[0];
+    for(const item of history){
+      if(item.endedAt > last.endedAt) last = item;
+    }
+    return Math.floor(last.duration / 1000 / 86400);
+  }
+
   // 1日 = レンガ1個。下の段から順に、段の中のどこに置かれるかはランダム。
   // 段が埋まったら1段上へ。1段おきに半分ずつずらして積む「破れ目地」で、実際のレンガ塀と同じ積み方になる
   // 壁は「その周期に必要な日数ぶんで画面がちょうど満タンになる」大きさで組み、
   // 満タンになったら次の(必要日数が長い)周期としてまた0から積み直す。
-  // 前回の周期の壁は、薄いゴーストとして背後に残す
+  // 前回の記録(Historyの直近の記録)は、次の30の倍数に達するまで薄いゴーストとして背後に残す
   function drawBlocks(days){
     if(!W || !H) return;
     ctx.clearRect(0,0,W,H);
@@ -728,14 +734,17 @@
     const currentCount = Math.max(1, daysIntoCycle + 1);
     const currentLayout = computeBrickSizing(cycleLength, availableHeight);
 
-    // 2周期目以降は、前回満タンにした壁を薄く背後に残す
-    if(cycleNumber > 1){
-      const prevCycleLength = 30 * (cycleNumber - 1);
-      const prevLayout = computeBrickSizing(prevCycleLength, availableHeight);
-      drawBrickWall(prevCycleLength, prevLayout, floorY, marginTop, 0.22);
+    // 前回の記録が、次の30の倍数に達するまではゴーストとして薄く背後に残す
+    const lastRecordDays = getLastHistoryRecordDays();
+    if(lastRecordDays && lastRecordDays > 0){
+      const hideThreshold = Math.ceil(lastRecordDays / 30) * 30;
+      if(days <= hideThreshold){
+        const ghostLayout = computeBrickSizing(lastRecordDays, availableHeight);
+        drawBrickWall(lastRecordDays, ghostLayout, floorY, marginTop, 0.22, 99999);
+      }
     }
 
-    drawBrickWall(currentCount, currentLayout, floorY, marginTop, 1);
+    drawBrickWall(currentCount, currentLayout, floorY, marginTop, 1, cycleNumber);
   }
 
   resize();
