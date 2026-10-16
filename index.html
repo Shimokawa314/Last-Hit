@@ -67,6 +67,32 @@
     -webkit-backdrop-filter:blur(8px);
     border-radius:28px;
     padding:2.6rem 2.2rem;
+    transition:opacity 0.25s ease;
+  }
+  /* ELAPSEDをタップで枠を消し、下のレンガをタップできるようにする */
+  .content-panel.panel-hidden{ opacity:0; pointer-events:none; }
+  .eyebrow-tap{
+    cursor:pointer;
+    padding:0.6rem 1rem;
+    margin:-0.6rem -1rem 0.8rem;
+    -webkit-tap-highlight-color:transparent;
+  }
+  .panel-restore{
+    display:none;
+    position:fixed;
+    top:calc(env(safe-area-inset-top, 0px) + 14px);
+    left:50%;
+    transform:translateX(-50%);
+    z-index:2;
+    background:rgba(237,238,234,0.7);
+    backdrop-filter:blur(8px);
+    -webkit-backdrop-filter:blur(8px);
+    color:var(--ink-soft);
+    font-size:0.68rem;
+    letter-spacing:0.32em;
+    text-transform:uppercase;
+    padding:0.5rem 1.1rem;
+    border-radius:999px;
   }
 
   .eyebrow{
@@ -292,6 +318,177 @@
     white-space:nowrap;
   }
   .history-best .history-duration{ color:var(--slate); font-weight:600; }
+
+  /* メモ */
+  .memo-card{ max-width:340px; width:88vw; text-align:left; }
+  .memo-day{
+    font-family:'Zen Old Mincho', serif;
+    font-size:1.15rem;
+    font-weight:600;
+    color:var(--ink);
+    text-align:center;
+  }
+  .memo-tag{
+    display:none;
+    text-align:center;
+    font-size:0.68rem;
+    letter-spacing:0.12em;
+    color:var(--mist);
+    margin-top:0.15rem;
+  }
+  .memo-reset-mark{
+    position:absolute;
+    top:-5px; bottom:-5px;
+    width:2px;
+    margin-left:-1px;
+    background:var(--ink);
+    border-radius:1px;
+  }
+  .memo-row-reset .memo-text{
+    font-family:'Zen Old Mincho', serif;
+    font-weight:600;
+    color:var(--slate);
+  }
+  .memo-range{
+    font-family:'Space Mono', monospace;
+    font-size:0.7rem;
+    color:var(--ink-soft);
+    text-align:center;
+    margin:0.2rem 0 1.1rem;
+  }
+  .log-day{
+    font-family:'Zen Old Mincho', serif;
+    font-weight:600;
+    font-size:0.8rem;
+    color:var(--slate);
+    margin-right:0.6rem;
+  }
+  .memo-bar{
+    position:relative;
+    height:10px;
+    border-radius:999px;
+    background:var(--paper-deep);
+    border:1px solid var(--line);
+    margin:0.5rem 0.4rem 0;
+  }
+  .memo-fill{
+    position:absolute; left:0; top:0; bottom:0;
+    border-radius:999px;
+    background:var(--mist);
+    opacity:0.45;
+  }
+  .memo-dot{
+    position:absolute;
+    top:50%;
+    width:14px; height:14px;
+    margin:-7px 0 0 -7px;
+    padding:0;
+    border-radius:50%;
+    background:var(--slate);
+    border:2px solid var(--paper);
+    box-shadow:0 0 0 1px var(--slate);
+  }
+  .memo-dot.on{ background:var(--paper); }
+  .memo-ticks{
+    display:flex;
+    justify-content:space-between;
+    margin:0.45rem 0.4rem 0;
+    font-family:'Space Mono', monospace;
+    font-size:0.6rem;
+    color:var(--mist);
+  }
+  .memo-list{
+    margin-top:1rem;
+    max-height:30vh;
+    overflow-y:auto;
+  }
+  .memo-row{
+    display:flex;
+    gap:0.6rem;
+    align-items:baseline;
+    padding:0.55rem 0.2rem;
+    border-bottom:1px solid var(--line);
+    transition:background 0.2s ease;
+  }
+  .memo-row:last-child{ border-bottom:none; }
+  .memo-row.on{ background:rgba(154,165,172,0.22); }
+  .memo-time{
+    font-family:'Zen Kaku Gothic New', sans-serif;
+    font-size:0.74rem;
+    font-weight:500;
+    color:var(--slate);
+    white-space:nowrap;
+    flex-shrink:0;
+    min-width:4.6rem;
+  }
+  .memo-date{
+    font-family:'Space Mono', monospace;
+    font-size:0.6rem;
+    color:var(--mist);
+    white-space:nowrap;
+    flex-shrink:0;
+  }
+  .memo-text{
+    flex:1;
+    font-size:0.88rem;
+    line-height:1.55;
+    color:var(--ink);
+    white-space:pre-wrap;
+    word-break:break-word;
+  }
+  .memo-del{
+    background:transparent;
+    color:var(--mist);
+    font-size:0.7rem;
+    padding:0.1rem 0.3rem;
+  }
+  .memo-del:hover{ color:var(--ink); }
+  .memo-input-row{
+    display:none;
+    gap:0.5rem;
+    margin-top:1rem;
+  }
+  .memo-input{
+    flex:1;
+    min-width:0;
+    font-family:'Zen Kaku Gothic New', sans-serif;
+    font-size:16px; /* iOSの自動ズーム防止 */
+    padding:0.6rem 0.8rem;
+    border:1px solid var(--line);
+    border-radius:12px;
+    background:rgba(255,255,255,0.6);
+    color:var(--ink);
+  }
+  .memo-input:focus{ outline:2px solid var(--slate); outline-offset:1px; }
+  .memo-add{
+    background:var(--slate);
+    color:var(--paper);
+    padding:0 1.1rem;
+    border-radius:12px;
+    font-size:0.85rem;
+  }
+  .log-row{
+    padding:0.65rem 0.2rem;
+    border-bottom:1px solid var(--line);
+  }
+  .log-row:last-child{ border-bottom:none; }
+  .log-date{
+    font-family:'Space Mono', monospace;
+    font-size:0.64rem;
+    color:var(--ink-soft);
+  }
+  .log-text{
+    margin-top:0.2rem;
+    font-size:0.88rem;
+    line-height:1.55;
+    white-space:pre-wrap;
+    word-break:break-word;
+  }
+  .log-reset .log-text{
+    font-family:'Zen Old Mincho', serif;
+    color:var(--slate);
+    font-weight:600;
+  }
 </style>
 </head>
 <body>
@@ -312,7 +509,7 @@
 
   <!-- 計測中 -->
   <div id="running-view" class="content-panel" style="display:none;">
-    <div class="eyebrow">Elapsed</div>
+    <div class="eyebrow eyebrow-tap" id="elapsed-toggle">Elapsed</div>
     <div class="days-row">
       <span class="days-num" id="day-count">0</span>
       <span class="days-label">日</span>
@@ -323,6 +520,7 @@
     </div>
 
     <div class="actions">
+      <button class="btn-reset" id="memo-btn">Memo</button>
       <button class="btn-reset" id="history-btn-running">History</button>
       <button class="btn-reset" id="reset-btn">Reset</button>
     </div>
@@ -356,10 +554,33 @@
 
 
 
+<button class="panel-restore" id="panel-restore">Elapsed</button>
+
+<div class="confirm-box" id="memo-box">
+  <div class="confirm-card memo-card">
+    <div class="memo-day" id="memo-day"></div>
+    <div class="memo-tag" id="memo-tag"></div>
+    <div class="memo-range" id="memo-range"></div>
+    <div class="memo-bar" id="memo-bar"></div>
+    <div class="memo-ticks"><span>0h</span><span>6h</span><span>12h</span><span>18h</span><span>24h</span></div>
+    <div class="memo-list" id="memo-list"></div>
+    <div class="memo-input-row" id="memo-input-row">
+      <input class="memo-input" id="memo-input" type="text" maxlength="200" placeholder="いまの気持ち" autocomplete="off">
+      <button class="memo-add" id="memo-add">残す</button>
+    </div>
+    <div class="confirm-row" style="margin-top:1.4rem;">
+      <button class="confirm-cancel" id="memo-close">閉じる</button>
+    </div>
+  </div>
+</div>
+
 <script>
 (function(){
   const STORAGE_KEY = 'quitSmokingStart';
   const HISTORY_KEY = 'quitSmokingHistory';
+  const NOTES_KEY = 'quitSmokingNotes';     // [{t, text}] Resetしても消さない
+  const RESETS_KEY = 'quitSmokingResets';   // [timestamp] Resetした時刻
+  const DAY_MS = 86400000;
 
   const idleView = document.getElementById('idle-view');
   const runningView = document.getElementById('running-view');
@@ -377,6 +598,22 @@
   const historyBtnRunning = document.getElementById('history-btn-running');
   const historyClose = document.getElementById('history-close');
   const histTabs = document.querySelectorAll('.hist-tab');
+  const memoBtn = document.getElementById('memo-btn');
+  const memoBox = document.getElementById('memo-box');
+  const memoRange = document.getElementById('memo-range');
+  const memoDayEl = document.getElementById('memo-day');
+  const elapsedToggle = document.getElementById('elapsed-toggle');
+  const panelRestore = document.getElementById('panel-restore');
+  let memoDay = null;
+  const memoTagEl = document.getElementById('memo-tag');
+  let ghostInfo = null; // 表示中のゴースト { start, days }
+  const memoBar = document.getElementById('memo-bar');
+  const memoList = document.getElementById('memo-list');
+  const memoInputRow = document.getElementById('memo-input-row');
+  const memoInput = document.getElementById('memo-input');
+  const memoAdd = document.getElementById('memo-add');
+  const memoClose = document.getElementById('memo-close');
+  let hitRects = [];
 
   let startTime = null;
   let tickHandle = null;
@@ -423,12 +660,23 @@
     localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
   }
 
+  function loadList(key){
+    try{
+      const raw = localStorage.getItem(key);
+      const v = raw ? JSON.parse(raw) : [];
+      return Array.isArray(v) ? v : [];
+    } catch(e){ return []; }
+  }
+  function saveList(key, list){
+    try{ localStorage.setItem(key, JSON.stringify(list)); } catch(e){}
+  }
+
   function renderHistory(){
     const history = loadHistory().slice().sort((a,b)=>{
       return historySortMode === 'recent'
         ? b.endedAt - a.endedAt
         : b.duration - a.duration;
-    });
+    }).slice(0, 7); // 表示は最大7件
     historyList.innerHTML = '';
     if(history.length === 0){
       historyList.innerHTML = '<div class="history-empty">まだ記録がありません</div>';
@@ -486,6 +734,7 @@
     idleView.style.alignItems = 'center';
     if(tickHandle){ clearInterval(tickHandle); tickHandle = null; }
     lastDrawnDays = 0;
+    setPanelHidden(false);
     drawBlocks(0);
   }
 
@@ -505,6 +754,206 @@
     showRunning();
   });
 
+  // --- メモ: 1日(24時間)ぶんのバーにドットを打ち、下に時系列で表示 ---
+  function formatShort(ts){
+    const d = new Date(ts);
+    return `${pad(d.getMonth()+1)}/${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  }
+
+  // 時間を「〇時間〇分」の形式にする(1時間未満は「〇分」)
+  function formatHM(ms){
+    const totalMin = Math.floor(ms / 60000);
+    const h = Math.floor(totalMin / 60);
+    const m = totalMin % 60;
+    return h > 0 ? `${h}時間${m}分` : `${m}分`;
+  }
+
+  // 過去の記録・今の記録の開始時刻をすべて集める(メモに開始時刻がない場合の補完用)
+  function allAttemptStarts(){
+    const starts = loadHistory().map(h=> h.endedAt - h.duration);
+    if(startTime) starts.push(startTime);
+    return starts.sort((a,b)=> a - b);
+  }
+
+  // メモ・Resetを「何日目の何時間目か」に直して、全期間ぶんをまとめて返す
+  function collectDayEntries(day){
+    const starts = allAttemptStarts();
+    function startFor(t, s){
+      if(s) return s;
+      let found = null;
+      for(const st of starts){ if(st <= t) found = st; }
+      return found;
+    }
+    const out = [];
+    loadList(NOTES_KEY).forEach(function(n){
+      const st = startFor(n.t, n.s);
+      if(st === null) return;
+      const elapsed = n.t - st;
+      if(Math.floor(elapsed / DAY_MS) + 1 !== day) return;
+      out.push({ type:'note', t:n.t, text:n.text, offset: elapsed % DAY_MS });
+    });
+    loadList(RESETS_KEY).forEach(function(r){
+      const t = (typeof r === 'number') ? r : r.t;
+      let st = (typeof r === 'number') ? null : r.s;
+      if(!st){
+        const h = loadHistory().find(x=> Math.abs(x.endedAt - t) < 5000);
+        if(h) st = h.endedAt - h.duration;
+      }
+      if(!st) return;
+      const elapsed = t - st;
+      if(Math.floor(elapsed / DAY_MS) + 1 !== day) return;
+      out.push({ type:'reset', t:t, text:'Reset', offset: elapsed % DAY_MS });
+    });
+    // 時系列(その日の何時間目か)の順。別の期間のメモもまとめて並べる
+    return out.sort((a,b)=> a.offset - b.offset || a.t - b.t);
+  }
+
+  function renderMemo(highlightT){
+    memoDayEl.textContent = 'Day' + memoDay;
+    memoTagEl.textContent = 'すべての期間のメモ';
+    memoTagEl.style.display = 'block';
+    memoRange.textContent = '';
+
+    const entries = collectDayEntries(memoDay);
+
+    memoBar.innerHTML = '';
+    memoList.innerHTML = '';
+    const rows = [];
+    const dots = [];
+    function highlight(i){
+      rows.forEach((r, k)=> r.classList.toggle('on', k === i));
+      dots.forEach((d, k)=> d && d.classList.toggle('on', k === i));
+      if(rows[i]) rows[i].scrollIntoView({ block:'nearest' });
+    }
+
+    entries.forEach(function(n, i){
+      const left = (n.offset / DAY_MS * 100) + '%';
+      const d = new Date(n.t);
+      const row = document.createElement('div');
+      row.className = 'memo-row' + (n.type === 'reset' ? ' memo-row-reset' : '');
+      const time = document.createElement('span');
+      time.className = 'memo-time';
+      time.textContent = formatHM(n.offset);
+      const text = document.createElement('span');
+      text.className = 'memo-text';
+      text.textContent = n.text;
+      const date = document.createElement('span');
+      date.className = 'memo-date';
+      date.textContent = `${d.getMonth()+1}/${d.getDate()}`;
+      row.appendChild(time);
+      row.appendChild(text);
+      row.appendChild(date);
+
+      if(n.type === 'note'){
+        const dot = document.createElement('button');
+        dot.className = 'memo-dot';
+        dot.style.left = left;
+        dot.setAttribute('aria-label', formatHM(n.offset) + ' ' + n.text);
+        dot.addEventListener('click', function(){ highlight(i); });
+        memoBar.appendChild(dot);
+        dots[i] = dot;
+
+        const del = document.createElement('button');
+        del.className = 'memo-del';
+        del.textContent = '削除';
+        del.addEventListener('click', function(){
+          saveList(NOTES_KEY, loadList(NOTES_KEY).filter(x=> !(x.t === n.t && x.text === n.text)));
+          renderMemo();
+        });
+        row.appendChild(del);
+      } else {
+        const mark = document.createElement('div');
+        mark.className = 'memo-reset-mark';
+        mark.style.left = left;
+        memoBar.appendChild(mark);
+      }
+      memoList.appendChild(row);
+      rows.push(row);
+    });
+
+    if(entries.length === 0){
+      memoList.innerHTML = '<div class="history-empty">この日のメモはまだありません</div>';
+    }
+    if(highlightT !== undefined){
+      const idx = entries.findIndex(n=> n.type === 'note' && n.t === highlightT);
+      if(idx >= 0) highlight(idx);
+    }
+
+    // 入力欄は「今まさに進行中の日」を開いた時だけ
+    memoInputRow.style.display = (startTime && memoDay === currentDayNumber()) ? 'flex' : 'none';
+  }
+
+  function currentDayNumber(){
+    return Math.floor((Date.now() - startTime) / DAY_MS) + 1;
+  }
+
+  function openMemo(day){
+    memoDay = day;
+    renderMemo();
+    memoBox.classList.add('open');
+  }
+
+  memoBtn.addEventListener('click', function(){
+    if(!startTime) return;
+    openMemo(currentDayNumber());
+  });
+
+  function addMemo(){
+    const text = memoInput.value.trim();
+    if(!text) return;
+    const now = Date.now();
+    if(memoDay !== currentDayNumber()){ renderMemo(); return; } // 日をまたいだ
+    const t = now;
+    const notes = loadList(NOTES_KEY);
+    notes.push({ t: t, text: text, s: startTime });
+    saveList(NOTES_KEY, notes);
+    memoInput.value = '';
+    renderMemo(t);
+  }
+  memoAdd.addEventListener('click', addMemo);
+  memoInput.addEventListener('keydown', function(e){
+    if(e.key === 'Enter' && !e.isComposing){ e.preventDefault(); addMemo(); }
+  });
+  memoClose.addEventListener('click', function(){
+    memoBox.classList.remove('open');
+  });
+
+  // レンガをタップ → その日(24時間)のメモを開く
+  function hitTestBrick(px, py){
+    // 1) 点が中に入っているレンガ(現在の壁を優先、次にゴースト)
+    for(const src of ['now', 'ghost']){
+      for(const r of hitRects){
+        if(r.src === src && px >= r.x && px <= r.x + r.w && py >= r.y && py <= r.y + r.h) return r;
+      }
+    }
+    // 2) 目地など、すき間をタップした場合は一番近いレンガ
+    let best = null, bestDist = Infinity;
+    for(const r of hitRects){
+      const dx = Math.max(r.x - px, 0, px - (r.x + r.w));
+      const dy = Math.max(r.y - py, 0, py - (r.y + r.h));
+      const dist = Math.hypot(dx, dy);
+      if(dist < bestDist){ bestDist = dist; best = r; }
+    }
+    return (best && bestDist <= 12) ? best : null;
+  }
+
+  function setPanelHidden(hidden){
+    runningView.classList.toggle('panel-hidden', hidden);
+    panelRestore.style.display = hidden ? 'block' : 'none';
+  }
+  elapsedToggle.addEventListener('click', function(){ setPanelHidden(true); });
+  panelRestore.addEventListener('click', function(){ setPanelHidden(false); });
+
+  document.querySelector('.stage').addEventListener('click', function(e){
+    if(e.target !== e.currentTarget || !startTime) return;
+    const r = hitTestBrick(e.clientX, e.clientY);
+    if(r){
+      openMemo(r.day);
+    } else if(runningView.classList.contains('panel-hidden')){
+      setPanelHidden(false);
+    }
+  });
+
   resetBtn.addEventListener('click', function(){
     confirmBox.classList.add('open');
   });
@@ -516,6 +965,9 @@
   confirmYes.addEventListener('click', function(){
     if(startTime){
       saveAttemptToHistory(Date.now() - startTime);
+      const resets = loadList(RESETS_KEY);
+      resets.push({ t: Date.now(), s: startTime });
+      saveList(RESETS_KEY, resets);
     }
     localStorage.removeItem(STORAGE_KEY);
     confirmBox.classList.remove('open');
@@ -638,15 +1090,15 @@
     return levelTarget;
   }
 
-  // Historyの中から直近(最後)の記録の日数を取得する
-  function getLastHistoryRecordDays(){
+  // Historyの中から一番長い記録を取得する
+  function getLongestHistoryRecord(){
     const history = loadHistory();
     if(!history || history.length === 0) return null;
-    let last = history[0];
+    let longest = history[0];
     for(const item of history){
-      if(item.endedAt > last.endedAt) last = item;
+      if(item.duration > longest.duration) longest = item;
     }
-    return Math.floor(last.duration / 1000 / 86400);
+    return longest;
   }
 
   // レンガの壁をcount個ぶん描画する(色・並び順の乱数はseedOffsetで種を変える)
@@ -656,6 +1108,7 @@
     const colorB = [140, 150, 158];
     const radius = Math.min(brickW, brickH) * 0.08;
     const seedBase = seedOffset * 100000;
+    const collectSrc = seedOffset === 1 ? 'now' : (seedOffset === 99999 ? 'ghost' : null);
 
     let placed = 0;
     let row = 0;
@@ -679,6 +1132,8 @@
 
         if(y < marginTop - brickH) continue;
         if(x > W || x + brickW < 0) continue;
+
+        if(collectSrc) hitRects.push({ x:x, y:y, w:brickW, h:brickH, day:placed, src:collectSrc });
 
         const rB = seededRandom(seedBase + row*53.1 + posInRow*7.7 + 1.3);
         const cr = Math.min(255, Math.max(0, Math.round(rowR + (rB-0.5)*70)));
@@ -719,6 +1174,8 @@
   function drawBlocks(days){
     if(!W || !H) return;
     ctx.clearRect(0,0,W,H);
+    hitRects = [];
+    ghostInfo = null;
     if(!days || days <= 0) return;
 
     const marginTop = 60;
@@ -730,12 +1187,14 @@
     const levelTarget = getLevelTarget(maxBricks);
     const currentLayout = computeBrickSizing(levelTarget, availableHeight);
 
-    // 前回の記録は、その記録に対応するレベル上限に達するまでゴーストとして薄く背後に残す
+    // 一番長い記録は、その記録に対応するレベル上限に達するまでゴーストとして薄く背後に残す
     // (現在の壁と同じサイズで重ねる)
-    const lastRecordDays = getLastHistoryRecordDays();
+    const longest = getLongestHistoryRecord();
+    const lastRecordDays = longest ? Math.ceil(longest.duration / DAY_MS) : 0; // リセットした日(途中の日)もブロックにする
     if(lastRecordDays && lastRecordDays > 0){
       const hideThreshold = getLevelTarget(lastRecordDays);
       if(maxBricks <= hideThreshold){
+        ghostInfo = { start: longest.endedAt - longest.duration, days: lastRecordDays };
         drawWall(lastRecordDays, currentLayout, floorY, marginTop, 0.22, 99999);
       }
     }
