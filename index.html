@@ -1176,7 +1176,7 @@
     ctx.clearRect(0,0,W,H);
     hitRects = [];
     ghostInfo = null;
-    if(!days || days <= 0) return;
+    days = days || 0; // 0日目でも過去の最長記録(ゴースト)は表示する
 
     const marginTop = 60;
     const marginBottom = 0;
