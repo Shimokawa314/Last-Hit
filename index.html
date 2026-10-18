@@ -320,7 +320,7 @@
   .history-best .history-duration{ color:var(--slate); font-weight:600; }
 
   /* メモ */
-  .memo-card{ max-width:340px; width:88vw; text-align:left; }
+  .memo-card{ max-width:360px; width:90vw; text-align:left; }
   .memo-day{
     font-family:'Zen Old Mincho', serif;
     font-size:1.15rem;
@@ -398,51 +398,71 @@
     color:var(--mist);
   }
   .memo-list{
-    margin-top:1rem;
-    max-height:30vh;
+    margin-top:1.1rem;
+    max-height:42vh;
     overflow-y:auto;
+    display:flex;
+    flex-direction:column;
+    gap:0.6rem;
   }
   .memo-row{
+    position:relative;
+    padding:0.7rem 0.9rem 0.65rem;
+    border-radius:14px;
+    background:rgba(255,255,255,0.55);
+    border:1px solid var(--line);
+    transition:background 0.2s ease, border-color 0.2s ease;
+  }
+  .memo-row.on{
+    background:rgba(154,165,172,0.26);
+    border-color:var(--mist);
+  }
+  .memo-head{
     display:flex;
-    gap:0.6rem;
-    align-items:baseline;
-    padding:0.55rem 0.2rem;
-    border-bottom:1px solid var(--line);
-    transition:background 0.2s ease;
+    align-items:center;
+    justify-content:space-between;
+    gap:0.5rem;
   }
-  .memo-row:last-child{ border-bottom:none; }
-  .memo-row.on{ background:rgba(154,165,172,0.22); }
   .memo-time{
-    font-family:'Zen Kaku Gothic New', sans-serif;
-    font-size:0.74rem;
-    font-weight:500;
-    color:var(--slate);
+    font-family:'Zen Old Mincho', serif;
+    font-size:0.7rem;
+    font-weight:600;
+    color:var(--slate-deep);
     white-space:nowrap;
-    flex-shrink:0;
-    min-width:4.6rem;
-  }
-  .memo-date{
-    font-family:'Space Mono', monospace;
-    font-size:0.6rem;
-    color:var(--mist);
-    white-space:nowrap;
-    flex-shrink:0;
-  }
-  .memo-text{
-    flex:1;
-    font-size:0.88rem;
-    line-height:1.55;
-    color:var(--ink);
-    white-space:pre-wrap;
-    word-break:break-word;
   }
   .memo-del{
     background:transparent;
     color:var(--mist);
     font-size:0.7rem;
-    padding:0.1rem 0.3rem;
+    padding:0.2rem 0.3rem;
   }
   .memo-del:hover{ color:var(--ink); }
+  .memo-text{
+    margin-top:0.25rem;
+    font-size:0.72rem;
+    line-height:1.6;
+    color:var(--ink);
+    white-space:pre-wrap;
+    word-break:break-word;
+  }
+  .memo-date{
+    margin-top:0.35rem;
+    font-family:'Space Mono', monospace;
+    font-size:0.62rem;
+    color:var(--ink-soft);
+    opacity:0.75;
+  }
+  .memo-row-reset{
+    background:transparent;
+    border:1px dashed var(--mist);
+  }
+  .memo-row-reset .memo-time{ color:var(--ink); }
+  .memo-row-reset .memo-text{
+    font-family:'Zen Old Mincho', serif;
+    font-weight:600;
+    color:var(--slate);
+    margin-top:0.15rem;
+  }
   .memo-input-row{
     display:none;
     gap:0.5rem;
@@ -828,19 +848,21 @@
 
     entries.forEach(function(n, i){
       const left = (n.offset / DAY_MS * 100) + '%';
-      const d = new Date(n.t);
       const row = document.createElement('div');
       row.className = 'memo-row' + (n.type === 'reset' ? ' memo-row-reset' : '');
+      const head = document.createElement('div');
+      head.className = 'memo-head';
       const time = document.createElement('span');
       time.className = 'memo-time';
-      time.textContent = formatHM(n.offset);
-      const text = document.createElement('span');
+      time.textContent = formatHM(n.offset); // スタートからの時間(その日の何時間目か)
+      head.appendChild(time);
+      const text = document.createElement('div');
       text.className = 'memo-text';
       text.textContent = n.text;
-      const date = document.createElement('span');
+      const date = document.createElement('div');
       date.className = 'memo-date';
-      date.textContent = `${d.getMonth()+1}/${d.getDate()}`;
-      row.appendChild(time);
+      date.textContent = formatShort(n.t) + ' に記録'; // 実際に記した日時はサブ表示
+      row.appendChild(head);
       row.appendChild(text);
       row.appendChild(date);
 
@@ -860,7 +882,7 @@
           saveList(NOTES_KEY, loadList(NOTES_KEY).filter(x=> !(x.t === n.t && x.text === n.text)));
           renderMemo();
         });
-        row.appendChild(del);
+        head.appendChild(del);
       } else {
         const mark = document.createElement('div');
         mark.className = 'memo-reset-mark';
